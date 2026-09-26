@@ -1,5 +1,6 @@
 // Usage: DATABASE_URL=... node scripts/init-db.js   (or: npm run init-db in server/)
 const fs = require('fs'), path = require('path');
+process.env.PG_CONNECT_TIMEOUT_MS ||= '20000'; // one-off setup: allow a slow first connection
 const { pool } = require('../server/lib/db');
 (async () => {
   if (!pool) { console.error('Set DATABASE_URL'); process.exit(1); }

@@ -113,3 +113,19 @@ budget time before the demo to verify the full pipeline, not just that it compil
 `src/biometrics.js` smooths whatever arrives (mock or Presage) into a continuous per-tick
 value via `advanceBiometricsSmoothing()`, so `getBiometrics()` always updates every physics
 frame regardless of how often the real sensor actually reports.
+
+## 8. Two-laptop play
+
+See `netplay/README.md` for setup. Short version: one laptop is the authoritative "host"
+(the only place `stepMatch()` ever runs), the other is a "guest" that only sends its local
+player's input and renders whatever state the host broadcasts. Deliberately not
+peer-to-peer/lockstep — two independent simulations would silently diverge, since
+`Mechanics` hooks read live biometric values that aren't identical across two machines
+(different local RNG for mock, different local clocks for the smoothing lerp). Host-only
+simulation means there's nothing to desync.
+
+`src/net.js` owns the WebSocket connection and role state; `netplay/server.js` is a dumb
+message relay (pairs one host + one guest, forwards raw frames, never parses payloads).
+Not part of the 250ms `state_snapshot` contract above — netplay uses its own
+higher-frequency `buildNetState()`/`matchFromNetState()` pair in `src/game.js` so C/D's
+contract usage is unaffected.

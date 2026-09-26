@@ -6,6 +6,9 @@ import { readInput } from './input.js';
 import {
   STAGE, PHYSICS, COMBAT, makeFighter, hurtbox, hitbox, overlaps,
 } from './fighter.js';
+import {
+  isNetHost, isNetGuest, broadcastState, requestRestart, setStateHandler, setRestartHandler,
+} from './net.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -226,8 +229,54 @@ export function buildSnapshot(match, t) {
   return { t, round: match.round, timeRemaining: match.timeRemaining, players: [p(1), p(2)] };
 }
 
+// Higher-frequency, render-focused payload for two-laptop play -- separate
+// from buildSnapshot()/state_snapshot (the 250ms contract C and D consume),
+// so netplay's needs (attack box, every tick) never touch that contract.
+export function buildNetState(match, t) {
+  const p = (id) => {
+    const f = match.fighters[id];
+    return {
+      id: f.id, hp: f.hp, maxHp: f.maxHp, meter: f.meter, maxMeter: f.maxMeter,
+      x: f.x, y: f.y, facing: f.facing, state: f.state, biometrics: f.biometrics,
+      biofeedback: f.biofeedback, // Host-derived HUD modifiers for the guest.
+      attack: f.attack ? { kind: f.attack.kind, phase: f.attack.phase } : null,
+    };
+  };
+  return {
+    t, round: match.round, timeRemaining: match.timeRemaining, over: match.over,
+    players: [p(1), p(2)],
+  };
+}
+
+// Guest side: turn a received net state back into a match-shaped object so
+// the existing render(ctx, match) needs no netplay-specific branches.
+export function matchFromNetState(state) {
+  const fighters = {};
+  for (const p of state.players) fighters[p.id] = { ...p };
+  return {
+    round: state.round, timeRemaining: state.timeRemaining, over: state.over, fighters,
+  };
+}
+
 export function runLoop({ onSnapshot, onRender } = {}) {
+  if (isNetGuest()) {
+    let latestMatch = null;
+    setStateHandler((state) => { latestMatch = matchFromNetState(state); });
+
+    function guestFrame() {
+      if (latestMatch) onRender?.(latestMatch);
+      requestAnimationFrame(guestFrame);
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'r') requestRestart();
+    });
+    requestAnimationFrame(guestFrame);
+    return null; // guest owns no authoritative match object
+  }
+
   const match = createMatch();
+  if (isNetHost()) setRestartHandler(() => resetMatch(match));
+
   let physicsAccMs = 0;
   let snapshotAccMs = 0;
   let last = performance.now();
@@ -249,6 +298,8 @@ export function runLoop({ onSnapshot, onRender } = {}) {
       bus.emit('state_snapshot', snap);
       onSnapshot?.(snap);
     }
+
+    if (isNetHost()) broadcastState(buildNetState(match, Date.now()));
 
     onRender?.(match);
     requestAnimationFrame(frame);
