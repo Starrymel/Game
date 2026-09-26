@@ -31,7 +31,11 @@ const player = Number(params.get('player')) || (role === 'guest' ? 2 : 1);
 
 if (role === 'host' || role === 'guest') {
   const netHost = params.get('host') || location.hostname;
-  const relayUrl = `ws://${netHost}:${params.get('relayPort') || 8788}/netplay`;
+  // On an HTTPS page browsers only allow wss://, so use the page's own address (the server proxies /netplay).
+  // ?host=<address> still overrides where to connect.
+  const relayUrl = location.protocol === 'https:'
+    ? `wss://${params.get('host') || location.host}/netplay`
+    : `ws://${netHost}:${params.get('relayPort') || 8788}/netplay`;
   connectNet({ relayUrl, asRole: role, myPlayer: player });
 }
 
