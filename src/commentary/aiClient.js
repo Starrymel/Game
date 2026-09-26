@@ -1,9 +1,10 @@
 // Owner: C
 // Browser side of the /api/ai proxy. Keys never reach the browser.
 
-// Moment types not worth an API round trip: they go stale before Gemini answers,
-// so the announcer uses a pre-written line instead.
-export const FALLBACK_ONLY = new Set(['hit']);
+// Moment types not worth an API round trip, so the announcer uses a pre-written
+// (pre-generated, instant) line instead: hits go stale before Gemini answers, and
+// round_start is the first request of a match, when connections are coldest.
+export const FALLBACK_ONLY = new Set(['hit', 'round_start']);
 
 // Returns a getLine(moment) for the announcer, plus remember(text) so recent lines
 // (from any source) are sent along to avoid repeats. On a 5xx (no key, Gemini down)
@@ -54,6 +55,12 @@ export function createGeminiLineSource({
   return {
     getLine,
     stats,
+    // Fire-and-forget: pre-open the server's upstream connections.
+    warm() {
+      Promise.resolve()
+        .then(() => fetchImpl(endpoint.replace(/\/line$/, '/warm'), { method: 'POST' }))
+        .catch(() => {});
+    },
     remember(text) {
       recent.push(text);
       if (recent.length > 5) recent.shift();

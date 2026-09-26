@@ -38,6 +38,30 @@ test('ttsStream errors: no key 503, HTTP error 502, timeout 504', async () => {
   }), { status: 504 });
 });
 
+test('library voice refused on free plan falls back to the default voice', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const prev = process.env.ELEVENLABS_VOICE_ID;
+  process.env.ELEVENLABS_VOICE_ID = 'libraryVoice123';
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    if (url.includes('libraryVoice123')) return { ok: false, status: 402, text: async () => '{"detail":{"code":"paid_plan_required"}}' };
+    return audioRes(['a']);
+  };
+  try {
+    assert.equal(el.voiceId(), 'libraryVoice123');
+    await el.ttsStream('Fight!', { apiKey: 'k', fetchImpl });
+    assert.match(urls[1], new RegExp(el.DEFAULT_VOICE));
+    assert.equal(el.voiceId(), el.DEFAULT_VOICE, 'sticks to default afterwards');
+    await el.ttsStream('Again', { apiKey: 'k', fetchImpl });
+    assert.equal(urls.length, 3, 'no second 402 round trip');
+    // Other 402s (e.g. out of credits) are real errors.
+    await assert.rejects(el.ttsStream('x', { apiKey: 'k', voice: 'v2', fetchImpl: async () => ({ ok: false, status: 402, text: async () => 'quota_exceeded' }) }), { status: 502 });
+  } finally {
+    if (prev === undefined) delete process.env.ELEVENLABS_VOICE_ID; else process.env.ELEVENLABS_VOICE_ID = prev;
+  }
+});
+
 test('cache key depends on voice, model and text', () => {
   assert.notEqual(el.cacheKey('a', 'v1', 'm'), el.cacheKey('a', 'v2', 'm'));
   assert.notEqual(el.cacheKey('a', 'v', 'm1'), el.cacheKey('a', 'v', 'm2'));

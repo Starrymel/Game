@@ -24,7 +24,10 @@ class TtsError extends Error {
   }
 }
 
-const voiceId = () => process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE;
+// Voice Library voices need a paid plan (free keys get 402 paid_plan_required). If the
+// configured voice is refused that way, use the default voice for the rest of the run.
+let configuredVoiceRefused = false;
+const voiceId = () => (!configuredVoiceRefused && process.env.ELEVENLABS_VOICE_ID) || DEFAULT_VOICE;
 const modelId = () => process.env.ELEVENLABS_MODEL_ID || DEFAULT_MODEL;
 
 function cacheKey(text, voice = voiceId(), model = modelId()) {
@@ -58,9 +61,22 @@ async function ttsStream(text, {
   clearTimeout(timer); // headers arrived; don't cut off the audio body mid-stream
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
+    if (res.status === 402 && voice !== DEFAULT_VOICE && /paid_plan_required/.test(detail)) {
+      if (voice === process.env.ELEVENLABS_VOICE_ID) configuredVoiceRefused = true;
+      console.warn(`[ai] voice ${voice} needs a paid ElevenLabs plan; using default voice ${DEFAULT_VOICE}`);
+      return ttsStream(text, { apiKey, voice: DEFAULT_VOICE, model, timeoutMs, fetchImpl });
+    }
     throw new TtsError(`ElevenLabs ${res.status}: ${detail.slice(0, 300)}`, 502);
   }
   return res;
+}
+
+// Opens the TLS connection to ElevenLabs without generating audio (status is ignored;
+// any response means the connection is up).
+async function warm({ apiKey = process.env.ELEVENLABS_API_KEY, fetchImpl = fetch } = {}) {
+  if (!apiKey) return false;
+  await fetchImpl('https://api.elevenlabs.io/v1/models', { headers: { 'xi-api-key': apiKey } });
+  return true;
 }
 
 // Whole clip as a Buffer (used by the pre-generation tool).
@@ -84,6 +100,7 @@ function createTtsCache(dir = CACHE_DIR) {
 }
 
 module.exports = {
-  ttsStream, ttsBuffer, createTtsCache, cacheKey, TtsError,
+  voiceId,
+  ttsStream, ttsBuffer, createTtsCache, warm, cacheKey, TtsError,
   DEFAULT_MODEL, DEFAULT_VOICE, OUTPUT_FORMAT,
 };

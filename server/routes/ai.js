@@ -3,6 +3,7 @@
 //
 //   POST /api/ai/line   { moment, recent? } -> { text, ms }
 //   GET  /api/ai/tts?text=...  -> audio/mpeg (streamed on first request, disk-cached after)
+//   POST /api/ai/warm   -> pre-opens Gemini + ElevenLabs connections (free), { gemini, tts, ms }
 //   POST /api/ai/summary  { match, samples, events, snapshots } (GET /api/matches/:id shape)
 //                         -> { headline, analysis, turningPoint, text, source, ms }
 //
@@ -58,6 +59,7 @@ function sanitizeMoment(m) {
 function createAiRouter({
   generateLine = gemini.generateLine,
   generateSummary = gemini.generateSummary,
+  warmers = { gemini: gemini.warm, tts: elevenlabs.warm },
   ttsStream = elevenlabs.ttsStream,
   ttsCache = elevenlabs.createTtsCache(),
   ttsLimit = createRateLimiter({ max: 60, windowMs: 60000 }),
@@ -80,6 +82,17 @@ function createAiRouter({
       console.warn('[ai] line failed:', err.message);
       res.status(err.status || 502).json({ error: err.message, ms: Date.now() - start });
     }
+  });
+
+  let lastWarm = 0;
+  router.post('/warm', async (_req, res) => {
+    // Throttled: several clients / round starts shouldn't multiply upstream calls.
+    if (Date.now() - lastWarm < 2000) return res.json({ skipped: true });
+    lastWarm = Date.now();
+    const start = Date.now();
+    const settle = (p) => Promise.resolve().then(p).then((ok) => !!ok, () => false);
+    const [g, t] = await Promise.all([settle(warmers.gemini), settle(warmers.tts)]);
+    res.json({ gemini: g, tts: t, ms: Date.now() - start });
   });
 
   router.post('/summary', async (req, res) => {
@@ -108,7 +121,7 @@ function createAiRouter({
     const text = typeof req.query.text === 'string' ? req.query.text.trim() : '';
     if (!text || text.length > MAX_TTS_CHARS) return res.status(400).json({ error: `text must be 1-${MAX_TTS_CHARS} chars` });
 
-    const key = elevenlabs.cacheKey(text);
+    let key = elevenlabs.cacheKey(text);
     if (ttsCache.has(key)) {
       res.set('X-TTS-Cache', 'hit');
       return res.type('audio/mpeg').sendFile(ttsCache.path(key), { maxAge: '1d' });
@@ -124,6 +137,7 @@ function createAiRouter({
       return res.status(err.status || 502).json({ error: err.message });
     }
 
+    key = elevenlabs.cacheKey(text); // voice may have fallen back to the default during the request
     res.set({ 'Content-Type': 'audio/mpeg', 'X-TTS-Cache': 'miss', 'X-TTS-Upstream-Ms': String(Date.now() - start) });
     res.flushHeaders();
     const chunks = [];

@@ -22,6 +22,7 @@ export function createElevenLabsPlayer({
   let ttsDisabledUntil = 0;
   let finishCurrent = null;
   const stats = { preline: 0, tts: 0, fallback: 0, ttsErrors: 0 };
+  const timings = []; // { type, kind, eventToAudioMs } for the last 50 clips
 
   const ready = manifest
     ? Promise.resolve()
@@ -36,16 +37,17 @@ export function createElevenLabsPlayer({
     return null;
   }
 
-  function playUrl(url) {
+  function playUrl(url, onPlaying) {
     return new Promise((resolve) => {
       const audio = createAudio();
+      audio.onplaying = () => { audio.onplaying = null; onPlaying?.(); };
       let settled = false;
       const safety = setTimeout(() => done('timeout'), maxClipMs);
       function done(result) {
         if (settled) return;
         settled = true;
         clearTimeout(safety);
-        audio.onended = audio.onerror = null;
+        audio.onended = audio.onerror = audio.onplaying = null;
         finishCurrent = null;
         resolve(result);
       }
@@ -61,11 +63,15 @@ export function createElevenLabsPlayer({
   return {
     stats,
     ready,
-    async play(text) {
+    async play(text, moment) {
       const src = sourceFor(text);
       if (src) {
         stats[src.kind] += 1;
-        const result = await playUrl(src.url);
+        const result = await playUrl(src.url, () => {
+          if (typeof moment?.t !== 'number') return;
+          timings.push({ type: moment.type, kind: src.kind, eventToAudioMs: now() - moment.t });
+          if (timings.length > 50) timings.shift();
+        });
         if (result !== 'error') return;
         if (src.kind === 'tts') {
           stats.ttsErrors += 1;
@@ -78,6 +84,16 @@ export function createElevenLabsPlayer({
     stop() {
       finishCurrent?.();
       fallback.stop();
+    },
+    latencyReport() {
+      const report = {};
+      for (const kind of ['preline', 'tts']) {
+        const xs = timings.filter((x) => x.kind === kind).map((x) => x.eventToAudioMs).sort((a, b) => a - b);
+        if (!xs.length) continue;
+        const pct = (p) => xs[Math.min(xs.length - 1, Math.ceil((p / 100) * xs.length) - 1)];
+        report[kind] = { n: xs.length, p50: pct(50), p95: pct(95), max: xs.at(-1) };
+      }
+      return { ...report, recent: timings.slice(-10) };
     },
   };
 }
