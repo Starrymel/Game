@@ -8,6 +8,7 @@ const SPOOL_DIR = process.env.SPOOL_DIR || path.join(__dirname, '..', 'spool');
 fs.mkdirSync(SPOOL_DIR, { recursive: true });
 
 const queue = [];
+const endListeners = [];                 // fn(match_id) after a match's final batch commits
 const startCache = new Map();            // match_id -> started_at (Date)
 const state = { ok: !!pool, lastError: pool ? null : 'DATABASE_URL not set', written: 0, spooled: 0, dropped: 0 };
 let working = false;
@@ -69,7 +70,11 @@ async function writeBatch(b) {
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
   finally { client.release(); }
+  if (b.end) for (const fn of endListeners) setImmediate(() => { try { fn(b.match_id); } catch (_) {} });
 }
+
+// Listeners must never throw into the ingest path; they run after the write, off the request.
+function onMatchEnd(fn) { endListeners.push(fn); }
 
 function spool(b) {
   try {
@@ -112,4 +117,4 @@ function enqueue(b) {
   if (queue.length > 500) { state.dropped++; return false; }   // hard cap: protect memory
   queue.push(b); setImmediate(drain); return true;
 }
-module.exports = { enqueue, state, queue, writeBatch };
+module.exports = { enqueue, state, queue, writeBatch, onMatchEnd };
