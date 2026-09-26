@@ -1,9 +1,13 @@
+import { drawHUD } from './ui/hud.js';
+import { beginEffects, drawEffects } from './ui/effects.js';
 import { STAGE, COMBAT, hurtbox, hitbox } from './fighter.js';
 
 const COLORS = { 1: '#4da3ff', 2: '#ff5c5c' };
 
 export function render(ctx, match) {
   ctx.clearRect(0, 0, STAGE.width, STAGE.height);
+
+  beginEffects(ctx);
 
   // ground
   ctx.fillStyle = '#1b1f2a';
@@ -30,27 +34,9 @@ export function render(ctx, match) {
       ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
     }
 
-    // HP bar
-    const barX = id === 1 ? 20 : STAGE.width - 220;
-    ctx.fillStyle = '#222';
-    ctx.fillRect(barX, 16, 200, 16);
-    ctx.fillStyle = f.hp > 30 ? '#4caf50' : '#e53935';
-    ctx.fillRect(barX, 16, 200 * (f.hp / f.maxHp), 16);
-
-    // Meter bar
-    ctx.fillStyle = '#222';
-    ctx.fillRect(barX, 36, 200, 8);
-    ctx.fillStyle = f.meter >= f.maxMeter ? '#ffd54f' : '#7e57c2';
-    ctx.fillRect(barX, 36, 200 * (f.meter / f.maxMeter), 8);
-
-    // Minimal biometrics readout (placeholder — B owns the real UI)
-    ctx.fillStyle = '#aaa';
-    ctx.font = '11px monospace';
-    ctx.fillText(
-      `HR ${Math.round(f.biometrics.hr)}  stress ${(f.biometrics.stress * 100 | 0)}%  [${f.biometrics.source}]`,
-      barX, 58,
-    );
   }
+  drawEffects(ctx, match);
+  drawHUD(ctx, match);
 
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 20px monospace';
@@ -64,7 +50,7 @@ export function render(ctx, match) {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 28px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('Round over — press R to restart', STAGE.width / 2, STAGE.height / 2);
+    ctx.fillText('Round over - press R to restart', STAGE.width / 2, STAGE.height / 2);
     ctx.textAlign = 'left';
   }
 }

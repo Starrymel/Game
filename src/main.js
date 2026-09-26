@@ -1,5 +1,5 @@
-import './logging/logger.js'; // D: match logging + analysis overlay (must load first to catch round_start)
-import './mechanics.config.js'; // load B's overrides (no-op stub for now)
+import './logging/logger.js'; // D: subscribe before round_start
+import './mechanics.config.js'; // B: biometric mechanics
 import { initInput } from './input.js';
 import { initBiometrics } from './biometrics.js';
 import { startPresageCapture, listCameraDevices } from './presage-capture.js';
@@ -7,6 +7,7 @@ import { runLoop } from './game.js';
 import { render } from './render.js';
 import { bus } from './eventBus.js';
 import { initCommentary } from './commentary/index.js';
+import { initDebugPanel } from './ui/debugPanel.js';
 
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
@@ -16,12 +17,14 @@ initBiometrics();
 // Commentary must subscribe before runLoop() so it hears the first round_start.
 window.__commentary = initCommentary({ bus });
 
-runLoop({
+const match = runLoop({
   onRender: (match) => render(ctx, match),
 });
+initDebugPanel(match);
 
 // Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).
 window.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('input, button, textarea, select')) return;
   const k = e.key.toLowerCase();
   if (k === '1') window.__forceBiometricState(1, 'stressed');
   if (k === '2') window.__forceBiometricState(2, 'stressed');

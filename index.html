@@ -4,12 +4,23 @@
 <meta charset="utf-8" />
 <title>Composure</title>
 <style>
-  html, body { margin: 0; background: #0b0d12; display: flex; align-items: center; justify-content: center; height: 100%; }
+  html, body { margin: 0; background: #0b0d12; color: #dfebff; font: 14px system-ui; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 12px; }
+  canvas { max-width: 100%; height: auto; }
+  #bio-debug { width: min(800px, 100%); box-sizing: border-box; background: #111c2e; padding: 16px; border: 1px solid #34445b; border-radius: 8px; }
+  summary { cursor: pointer; font-weight: bold; }
+  #bio-sliders { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  fieldset { flex: 1; min-width: 260px; border: 1px solid #34445b; }
+  label { display: grid; grid-template-columns: 170px 1fr 44px; gap: 10px; align-items: center; margin: 6px 0; font-size: 12px; }
+  fieldset label { grid-template-columns: 55px 1fr 38px; }
+  input { min-width: 0; accent-color: #65e9b2; }
+  button { padding: 8px 12px; background: #243e58; color: white; border: 1px solid #638bad; border-radius: 4px; cursor: pointer; }
   canvas { image-rendering: pixelated; box-shadow: 0 0 0 2px #333; }
 </style>
 </head>
 <body>
 <canvas id="stage" width="800" height="400"></canvas>
+<div>P1: A/D · W jump · S block · F hit · G special | P2: arrows · K hit · L special | R restart</div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

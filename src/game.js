@@ -1,6 +1,7 @@
 import { bus } from './eventBus.js';
 import { Mechanics } from './mechanics.js';
 import { getBiometrics, advanceBiometricsSmoothing } from './biometrics.js';
+import { updateBiofeedback } from './mechanics.config.js';
 import { readInput } from './input.js';
 import {
   STAGE, PHYSICS, COMBAT, makeFighter, hurtbox, hitbox, overlaps,
@@ -96,7 +97,6 @@ function resolveHit(match, attacker, defender, kind, t) {
 }
 
 function updateFighter(match, f, opponent, dtSeconds, t) {
-  f.biometrics = getBiometrics(f.id);
 
   if (f.state === 'ko') return;
 
@@ -195,6 +195,12 @@ function updateFighter(match, f, opponent, dtSeconds, t) {
 
 export function stepMatch(match, dtSeconds, t) {
   if (match.over) return;
+  advanceBiometricsSmoothing(dtSeconds);
+  // Read the selected source for both fighters before either can hit the other.
+  for (const f of Object.values(match.fighters)) {
+    f.biometrics = getBiometrics(f.id);
+    updateBiofeedback(f, f.biometrics, dtSeconds, t);
+  }
 
   match.timeRemaining = Math.max(0, match.timeRemaining - dtSeconds);
   if (match.timeRemaining === 0) {
@@ -205,7 +211,6 @@ export function stepMatch(match, dtSeconds, t) {
     return;
   }
 
-  advanceBiometricsSmoothing(dtSeconds);
   updateFighter(match, match.fighters[1], match.fighters[2], dtSeconds, t);
   updateFighter(match, match.fighters[2], match.fighters[1], dtSeconds, t);
 }
@@ -250,7 +255,7 @@ export function runLoop({ onSnapshot, onRender } = {}) {
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 'r') resetMatch(match);
+    if (!e.target.closest?.('input, button, textarea, select') && e.key.toLowerCase() === 'r') resetMatch(match);
   });
 
   requestAnimationFrame(frame);

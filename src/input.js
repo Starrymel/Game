@@ -6,7 +6,13 @@ const BINDINGS = {
 };
 
 export function initInput() {
-  window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
+  window.addEventListener('keydown', (e) => {
+    if (e.target.closest?.('input, button, textarea, select')) return;
+    if (e.key.startsWith('Arrow')) e.preventDefault();
+    keys.add(e.key.toLowerCase());
+  });
+  window.addEventListener('blur', () => keys.clear());
+  window.addEventListener('focusin', () => keys.clear());
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 }
 
