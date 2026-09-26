@@ -10,6 +10,7 @@ import { initCommentary } from './commentary/index.js';
 import { initDebugPanel } from './ui/debugPanel.js';
 import { initPresagePanel } from './ui/presagePanel.js';
 import { connectNet } from './net.js';
+import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
 
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
@@ -31,13 +32,8 @@ const role = params.get('role'); // 'host' | 'guest' | null
 const player = Number(params.get('player')) || (role === 'guest' ? 2 : 1);
 
 if (role === 'host' || role === 'guest') {
-  const netHost = params.get('host') || location.hostname;
-  // On an HTTPS page browsers only allow wss://, so use the page's own address (the server proxies /netplay).
-  // ?host=<address> still overrides where to connect.
-  const relayUrl = location.protocol === 'https:'
-    ? `wss://${params.get('host') || location.host}/netplay`
-    : `ws://${netHost}:${params.get('relayPort') || 8788}/netplay`;
-  connectNet({ relayUrl, asRole: role, myPlayer: player });
+  // URL choice (same Wi-Fi vs hosted https site, ?host=, ?room=) lives in netconfig.js.
+  connectNet({ relayUrl: relayUrlFor(location, params), asRole: role, myPlayer: player });
 }
 
 initInput();
@@ -45,13 +41,9 @@ initBiometrics();
 // Commentary must subscribe before runLoop() so it hears the first round_start.
 window.__commentary = initCommentary({ bus });
 
-// Same host-detection ?host=<address> pattern as the netplay relay above, so
-// the guest's camera panel talks to the host's bridge with no manual URL
-// typing. Bridge isn't behind the HTTPS proxy (that's netplay-only so far),
-// so this stays ws:// even on an https page -- override wsUrl by hand if
-// that changes.
-const bridgeHost = params.get('host') || location.hostname;
-const bridgeWsUrl = `ws://${bridgeHost}:${params.get('bridgePort') || 8787}/biometrics`;
+// Where the Presage bridge is: on the host laptop when on the same Wi-Fi (?host=<address>), or on THIS laptop
+// (localhost) when the page is the hosted https site. See netconfig.js.
+const bridgeWsUrl = bridgeUrlFor(location, params);
 initPresagePanel({ wsUrl: bridgeWsUrl });
 
 const match = runLoop({

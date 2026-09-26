@@ -28,9 +28,11 @@ wss.on('connection', (ws, req) => {
   slots[role] = ws;
   console.log(`[netplay] ${role} connected`);
 
-  ws.on('message', (data) => {
+  ws.on('message', (data, isBinary) => {
     const peer = slots[other(role)];
-    if (peer && peer.readyState === peer.OPEN) peer.send(data);
+    // Forward text as text: re-sending a Buffer defaults to a binary frame, which browsers then
+    // deliver as a Blob that JSON.parse() can't read (broke two-laptop play in real browsers).
+    if (peer && peer.readyState === peer.OPEN) peer.send(data, { binary: isBinary });
   });
 
   ws.on('close', () => {

@@ -42,4 +42,6 @@ app.use('/dashboard', express.static(path.join(ROOT, 'dashboard')));
 app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`[server] http://localhost:${PORT}  db=${pool ? 'configured' : 'none (logging disabled)'}`));
+const server = app.listen(PORT, () => console.log(`[server] http://localhost:${PORT}  db=${pool ? 'configured' : 'none (logging disabled)'}`));
+// Two-laptop relay on the same port (wss://<site>/netplay), so a single-port host like Render can run everything.
+require('./lib/relay').attachRelay(server, { log: (m) => console.log(m) });

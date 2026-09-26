@@ -1,0 +1,23 @@
+# Owner: D. Render "Blueprint": one web service that runs everything (game, dashboard, API, and the two-player relay).
+# Use: Render dashboard -> New -> Blueprint -> pick this GitHub repo. Then fill in the secret values below (sync: false).
+services:
+  - type: web
+    name: composure
+    runtime: node
+    plan: free                  # free sleeps after ~15 min without traffic (about a minute to wake up); a paid plan does not
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL       # the Tiger Data connection string (postgres://...)
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: DEV_ROUTES         # 1 = the fake-match test route exists; set to 0 for the final demo
+        value: "1"

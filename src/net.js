@@ -4,6 +4,8 @@
 // This sidesteps deterministic-lockstep desync entirely (see CONTRACT.md) --
 // there's exactly one place gameplay math ever runs.
 import { setRemoteInput, readInput } from './input.js';
+import { bus } from './eventBus.js';
+import { isForwardableSample, acceptGuestSample } from './netconfig.js';
 
 const INPUT_SEND_HZ = 60;
 
@@ -30,7 +32,9 @@ export function connectNet({ relayUrl, asRole, myPlayer }) {
   localPlayer = myPlayer;
   remotePlayer = myPlayer === 1 ? 2 : 1;
 
-  socket = new WebSocket(`${relayUrl}?role=${asRole}`);
+  const url = new URL(relayUrl);              // may already carry ?room=
+  url.searchParams.set('role', asRole);
+  socket = new WebSocket(url.toString());
 
   socket.onmessage = (evt) => {
     const msg = JSON.parse(evt.data);
@@ -40,6 +44,10 @@ export function connectNet({ relayUrl, asRole, myPlayer }) {
       onRemoteState?.(msg.state);
     } else if (msg.type === 'restart' && role === 'host') {
       onRestartRequested?.();
+    } else if (msg.type === 'bio' && role === 'host') {
+      // The guest's own camera readings (computed by the guest's local Presage bridge).
+      const sample = acceptGuestSample(msg.sample, remotePlayer);
+      if (sample) bus.emit('biometric_sample', sample);
     }
   };
   socket.onerror = (e) => console.warn(`[net] ${role} socket error`, e);
@@ -51,6 +59,10 @@ export function connectNet({ relayUrl, asRole, myPlayer }) {
         send({ type: 'input', input: readInput(localPlayer) });
       }, 1000 / INPUT_SEND_HZ);
     };
+    // This laptop's local bridge produces readings for our player; the host runs the game, so send them there.
+    bus.on('biometric_sample', (sample) => {
+      if (isForwardableSample(sample, localPlayer)) send({ type: 'bio', sample });
+    });
   }
 
   return socket;
