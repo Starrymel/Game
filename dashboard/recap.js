@@ -155,7 +155,10 @@ async function generateSummary(d) {
 
 async function showSummary(d) {
   const el = $('summary');
-  const put = (text) => { el.className = 'summary'; el.textContent = text; el.title = text; };
+  // The recap is a quick read: show only the headline sentence. The full text is kept in the title tooltip,
+  // saved in the database, and shown in full on the "Full analysis" page.
+  const firstSentence = (t) => { const m = t.match(/^[\s\S]+?[.!?](?=\s|$)/); return (m ? m[0] : t).trim(); };
+  const put = (text) => { el.className = 'summary'; el.textContent = firstSentence(text); el.title = text; };
   if (d.match.summary) return put(d.match.summary);
 
   el.className = 'summary waiting';
