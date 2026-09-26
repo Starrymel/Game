@@ -6,6 +6,7 @@
     "start": "node server/index.js",
     "init-db": "node scripts/init-db.js",
     "seed": "node scripts/seed.js",
+    "pregen": "node --env-file=.env tools/pregen-lines.js",
     "test": "node --test 'tests/**/*.test.js'"
   },
   "dependencies": {
