@@ -9,6 +9,19 @@
 const HEADER_BYTES = 20;
 
 export async function listCameraDevices() {
+  // Browsers hide device labels/IDs from enumerateDevices() until the page
+  // has been granted camera permission at least once -- request it first
+  // (grabbing whatever the default camera is, then releasing it immediately)
+  // so the real list is usable on the very first call.
+  let probe = null;
+  try {
+    probe = await navigator.mediaDevices.getUserMedia({ video: true });
+  } catch (e) {
+    console.warn('[presage-capture] camera permission needed to list real device labels', e);
+  } finally {
+    probe?.getTracks().forEach((t) => t.stop());
+  }
+
   const devices = await navigator.mediaDevices.enumerateDevices();
   return devices.filter((d) => d.kind === 'videoinput');
 }
