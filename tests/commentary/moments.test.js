@@ -1,0 +1,158 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createMomentDetector, PRIORITY } from '../../src/commentary/moments.js';
+import { startCommentaryListener } from '../../src/commentary/listener.js';
+import { replayMatchSync } from '../../tools/replay-match.js';
+
+const bio = (hr = 80, calm = 0.5) => ({ hr, breath: 14, stress: 1 - calm, calm, source: 'mock' });
+const snap = (t, hp1, hp2, b1 = bio(), b2 = bio()) => ({
+  t, round: 1, timeRemaining: 90,
+  players: [
+    { id: 1, hp: hp1, maxHp: 100, meter: 0, maxMeter: 100, biometrics: b1 },
+    { id: 2, hp: hp2, maxHp: 100, meter: 0, maxMeter: 100, biometrics: b2 },
+  ],
+});
+const types = (ms) => ms.map((m) => m.type);
+
+test('passes through ko/special/meter_full/round events with priorities', () => {
+  const d = createMomentDetector();
+  assert.deepEqual(types(d.handle('round_start', { round: 1, t: 0 })), ['round_start']);
+  assert.deepEqual(types(d.handle('meter_full', { player: 1, t: 1 })), ['meter_full']);
+  assert.deepEqual(types(d.handle('special', { player: 1, t: 2 })), ['special']);
+  const [ko] = d.handle('ko', { winner: 1, loser: 2, t: 3 });
+  assert.equal(ko.priority, PRIORITY.ko);
+  assert.equal(ko.player, 1);
+  assert.deepEqual(d.handle('ko', { winner: 1, loser: 2, t: 4 }), [], 'ko fires once per round');
+  assert.ok(PRIORITY.ko > PRIORITY.special && PRIORITY.special > PRIORITY.big_flinch
+    && PRIORITY.big_flinch > PRIORITY.hit);
+});
+
+test('only big flinches become moments', () => {
+  const d = createMomentDetector();
+  assert.deepEqual(d.handle('flinch', { player: 2, magnitude: 0.3, t: 0 }), []);
+  assert.deepEqual(types(d.handle('flinch', { player: 2, magnitude: 0.7, t: 1 })), ['big_flinch']);
+});
+
+test('combo after 3 hits in window; broken by gap or other attacker', () => {
+  const d = createMomentDetector();
+  const hit = (attacker, t) => types(d.handle('hit', { attacker, defender: 3 - attacker, damage: 5, kind: 'light', t }));
+  assert.deepEqual(hit(1, 0), ['hit']);
+  assert.deepEqual(hit(1, 1000), ['hit']);
+  assert.deepEqual(hit(1, 2000), ['combo']);
+  assert.deepEqual(hit(1, 9000), ['hit'], 'gap resets');
+  assert.deepEqual(hit(1, 9500), ['hit']);
+  assert.deepEqual(hit(2, 9600), ['hit'], 'other attacker resets');
+  assert.deepEqual(hit(1, 9700), ['hit']);
+});
+
+test('heal streak: accumulates small ticks, reset by getting hit, has cooldown', () => {
+  const d = createMomentDetector();
+  const tick = (t) => d.handle('heal_tick', { player: 1, amount: 0.5, t });
+  let out = [];
+  for (let t = 0; t < 3000; t += 250) out.push(...tick(t)); // 12 ticks = 6 HP
+  assert.deepEqual(out, []);
+  d.handle('hit', { attacker: 2, defender: 1, damage: 5, kind: 'light', t: 3000 });
+  for (let t = 3250; t < 6250; t += 250) out.push(...tick(t)); // 6 HP again, reset
+  assert.deepEqual(out, [], 'hit wiped the streak');
+  for (let t = 6250; t < 7500; t += 250) out.push(...tick(t)); // +2.5 -> 8.5
+  assert.deepEqual(types(out), ['heal_streak']);
+  out = [];
+  for (let t = 7500; t < 12000; t += 250) out.push(...tick(t));
+  assert.deepEqual(out, [], 'cooldown');
+});
+
+test('comeback when a player erases a big deficit', () => {
+  const d = createMomentDetector();
+  assert.deepEqual(d.handle('state_snapshot', snap(0, 100, 60)), []);
+  assert.deepEqual(d.handle('state_snapshot', snap(250, 90, 60)), []);
+  const out = d.handle('state_snapshot', snap(500, 55, 60));
+  assert.deepEqual(types(out), ['comeback']);
+  assert.equal(out[0].player, 2);
+  assert.equal(out[0].data.wasBehindBy, 40);
+  assert.deepEqual(d.handle('state_snapshot', snap(750, 50, 60)), [], 'no repeat');
+});
+
+test('panic spike on HR jump within window, with cooldown', () => {
+  const d = createMomentDetector();
+  assert.deepEqual(d.handle('state_snapshot', snap(0, 100, 100, bio(80))), []);
+  assert.deepEqual(d.handle('state_snapshot', snap(2000, 100, 100, bio(95))), []);
+  const out = d.handle('state_snapshot', snap(4000, 100, 100, bio(101)));
+  assert.deepEqual(types(out), ['panic_spike']);
+  assert.deepEqual(out[0].data, { from: 80, to: 101 });
+  assert.deepEqual(d.handle('state_snapshot', snap(5000, 100, 100, bio(80))), []);
+  assert.deepEqual(d.handle('state_snapshot', snap(6000, 100, 100, bio(110))), [], 'cooldown');
+});
+
+test('slow HR drift outside the window is not a panic spike', () => {
+  const d = createMomentDetector();
+  let out = [];
+  for (let t = 0, hr = 70; t <= 30000; t += 1000, hr += 1.5) {
+    out.push(...d.handle('state_snapshot', snap(t, 100, 100, bio(hr))));
+  }
+  assert.deepEqual(out, []);
+});
+
+test('calm clutch: low HP + calm held for 2s, once per round', () => {
+  const d = createMomentDetector();
+  const calmLow = (t, calm = 0.8) => d.handle('state_snapshot', snap(t, 20, 100, bio(80, calm)));
+  assert.deepEqual(calmLow(0), []);
+  assert.deepEqual(calmLow(1000, 0.4), [], 'lost calm resets hold');
+  assert.deepEqual(calmLow(1250), []);
+  assert.deepEqual(calmLow(3000), []);
+  assert.deepEqual(types(calmLow(3250)), ['calm_clutch']);
+  assert.deepEqual(calmLow(9000), []);
+  d.handle('round_start', { round: 2, t: 10000 });
+  calmLow(10000);
+  assert.deepEqual(types(calmLow(12000)), ['calm_clutch'], 're-armed next round');
+});
+
+test('moments carry compact HP/HR context from latest snapshot', () => {
+  const d = createMomentDetector();
+  d.handle('state_snapshot', snap(0, 82.4, 50, bio(91.6, 0.3)));
+  const [m] = d.handle('special', { player: 1, t: 10 });
+  assert.deepEqual(m.context.players[0], {
+    id: 1, hp: 82, maxHp: 100, meter: 0, hr: 92, breath: 14, stress: 0.7, calm: 0.3,
+  });
+});
+
+test('fake match fixture replays through the bus and hits every moment type', () => {
+  const fixture = JSON.parse(readFileSync(new URL('../../fixtures/fake-match.json', import.meta.url)));
+  const listeners = new Map();
+  const bus = {
+    on(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); return () => listeners.delete(type); },
+    emit(type, p) { listeners.get(type)?.forEach((fn) => fn(p)); },
+  };
+  const seen = [];
+  const listener = startCommentaryListener({ bus, onMoment: (m) => seen.push(m) });
+  replayMatchSync(bus, fixture);
+
+  const got = new Set(types(seen));
+  for (const t of Object.keys(PRIORITY)) assert.ok(got.has(t), `missing ${t}`);
+
+  const ko = seen.find((m) => m.type === 'ko');
+  assert.equal(ko.data.winner, 2);
+  const comeback = seen.find((m) => m.type === 'comeback');
+  assert.equal(comeback.player, 2);
+  assert.ok(comeback.t < ko.t);
+
+  listener.stop();
+  const before = seen.length;
+  replayMatchSync(bus, fixture);
+  assert.equal(seen.length, before, 'stop() unsubscribes');
+});
+
+test('replayMatch plays in scaled real time and restamps t', async () => {
+  const fixture = { meta: {}, events: [
+    { at: 0, type: 'x', payload: { t: 1 } },
+    { at: 200, type: 'x', payload: { t: 2 } },
+  ] };
+  const got = [];
+  const { replayMatch } = await import('../../tools/replay-match.js');
+  const start = Date.now();
+  const r = replayMatch({ emit: (_, p) => got.push(p) }, fixture, { speed: 4 });
+  await r.done;
+  assert.equal(got.length, 2);
+  assert.ok(Date.now() - start >= 45, 'waited ~50ms at 4x');
+  assert.ok(got[1].t >= start, 'restamped with Date.now()');
+});
