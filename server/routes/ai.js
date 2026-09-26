@@ -3,6 +3,8 @@
 //
 //   POST /api/ai/line   { moment, recent? } -> { text, ms }
 //   GET  /api/ai/tts?text=...  -> audio/mpeg (streamed on first request, disk-cached after)
+//   POST /api/ai/summary  { match, samples, events, snapshots } (GET /api/matches/:id shape)
+//                         -> { headline, analysis, turningPoint, text, source, ms }
 //
 // Keeps API keys server-side. The browser falls back to pre-written lines on any error.
 
@@ -13,6 +15,7 @@ const { MOMENT_HINTS } = require('../ai/prompts');
 
 const MAX_RECENT = 5;
 const MAX_TTS_CHARS = 200;
+const MAX_LOG_ROWS = 5000;
 
 // Tiny fixed-window limiter so a public /tts can't be used to burn ElevenLabs credits.
 function createRateLimiter({ max, windowMs, now = () => Date.now() }) {
@@ -54,6 +57,7 @@ function sanitizeMoment(m) {
 
 function createAiRouter({
   generateLine = gemini.generateLine,
+  generateSummary = gemini.generateSummary,
   ttsStream = elevenlabs.ttsStream,
   ttsCache = elevenlabs.createTtsCache(),
   ttsLimit = createRateLimiter({ max: 60, windowMs: 60000 }),
@@ -76,6 +80,28 @@ function createAiRouter({
       console.warn('[ai] line failed:', err.message);
       res.status(err.status || 502).json({ error: err.message, ms: Date.now() - start });
     }
+  });
+
+  router.post('/summary', async (req, res) => {
+    const b = req.body ?? {};
+    const rows = (x) => (Array.isArray(x) ? x.slice(0, MAX_LOG_ROWS) : []);
+    const detail = {
+      match: b.match && typeof b.match === 'object' ? b.match : {},
+      samples: rows(b.samples),
+      events: rows(b.events),
+      snapshots: rows(b.snapshots),
+    };
+    if (!detail.snapshots.length && !detail.events.length) return res.status(400).json({ error: 'empty match log' });
+    const start = Date.now();
+    const s = await generateSummary(detail);
+    res.json({
+      headline: s.headline,
+      analysis: s.analysis,
+      turningPoint: s.turningPoint,
+      text: `${s.headline} ${s.analysis} Turning point: ${s.turningPoint}`,
+      source: s.source,
+      ms: Date.now() - start,
+    });
   });
 
   router.get('/tts', async (req, res) => {

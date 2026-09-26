@@ -8,6 +8,7 @@
 //   - per-type cooldowns so flinches/hits don't spam
 //   - stale drop: a moment too old by the time it would play is skipped
 //   - high-priority moments (KO/special) interrupt lower-priority speech
+//   - moment.text (preset line, e.g. summary headline) is spoken as-is
 //   - getLine(moment) (e.g. Gemini) raced against a timeout, falling back to
 //     pre-written lines so the game never goes silent
 //
@@ -20,7 +21,7 @@ export const ANNOUNCER_DEFAULTS = {
   maxQueue: 4,
   lineTimeoutMs: 1200,      // give getLine this long, then use a fallback line
   interruptPriority: 90,    // moments at/above this cut off lower-priority speech
-  maxAgeMs: { ko: 8000, round_start: 4000, round_end: 6000, special: 3000, comeback: 3500, big_flinch: 1500, hit: 1200, default: 2500 },
+  maxAgeMs: { post_match: 15000, ko: 8000, round_start: 4000, round_end: 6000, special: 3000, comeback: 3500, big_flinch: 1500, hit: 1200, default: 2500 },
   cooldownMs: { hit: 5000, big_flinch: 4000, combo: 3000, panic_spike: 8000, heal_streak: 8000, meter_full: 6000, default: 0 },
 };
 
@@ -77,6 +78,7 @@ export function createAnnouncer({
   }
 
   async function resolveLine(moment) {
+    if (typeof moment.text === 'string') return { text: moment.text, source: 'preset' };
     if (getLine) {
       let timer;
       try {
@@ -110,7 +112,8 @@ export function createAnnouncer({
 
         lastSpokenAt[moment.type] = now();
         stats.spoken += 1;
-        stats[source === 'getLine' ? 'fromGetLine' : 'fromFallback'] += 1;
+        if (source === 'getLine') stats.fromGetLine += 1;
+        if (source === 'fallback') stats.fromFallback += 1;
         onLine?.({ text, moment, source });
         try {
           await player.play(text, moment);

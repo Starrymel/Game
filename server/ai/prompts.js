@@ -71,4 +71,36 @@ function commentaryContents(moment, recent) {
   return contents;
 }
 
-module.exports = { COMMENTARY_SYSTEM, MOMENT_HINTS, buildLinePrompt, commentaryContents };
+const SUMMARY_SYSTEM = `You are the post-match analyst for "Composure", a 2-player fighting game driven by
+real biometrics: calm fighters heal and charge their special meter; stressed fighters
+flinch harder. You get a compact match log (JSON). Explain the match through composure:
+who stayed calm, who cracked, and the turning point.
+
+Rules:
+- Use only facts in the log. Never invent events, numbers, or times.
+- Refer to fighters by the names in "names".
+- Event fields: "victim" = who got hit or flinched; "player" = who did it (special,
+  heal_streak, meter_full); ko has winner and loser. Times are seconds from the start.
+- headline: max 15 words, spoken aloud by the announcer, punchy.
+- analysis: 2-4 sentences, plain English, cite 1-3 concrete numbers (HR peaks, calm %, HP).
+- turningPoint: one sentence naming the moment the match swung, with its time.`;
+
+const SUMMARY_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    headline: { type: 'STRING' },
+    analysis: { type: 'STRING' },
+    turningPoint: { type: 'STRING' },
+  },
+  required: ['headline', 'analysis', 'turningPoint'],
+  propertyOrdering: ['headline', 'analysis', 'turningPoint'],
+};
+
+function summaryContents(compact) {
+  return [{ role: 'user', parts: [{ text: `Match log:\n${JSON.stringify(compact)}` }] }];
+}
+
+module.exports = {
+  COMMENTARY_SYSTEM, MOMENT_HINTS, buildLinePrompt, commentaryContents,
+  SUMMARY_SYSTEM, SUMMARY_SCHEMA, summaryContents,
+};
