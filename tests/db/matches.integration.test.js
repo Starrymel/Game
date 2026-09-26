@@ -32,8 +32,9 @@ before(async () => {
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${server.address().port}/api/matches`;
   const { createAutoSummary } = require('../../server/lib/autoSummary.js');
+  const { createMatchStore } = require('../../server/lib/matchStore.js');
   autoSummary = createAutoSummary({
-    pool, log: { log() {}, warn() {} },
+    store: createMatchStore({ pool }), log: { log() {}, warn() {} },
     generateSummary: async (d) => ({ headline: `Auto for ${d.match.id}!`, analysis: 'A.', turningPoint: 'T.', source: 'gemini' }),
   });
 });

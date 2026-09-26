@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pool } = require('./db');
+const { getMatchStore } = require('./matchStore');
 
 const SPOOL_DIR = process.env.SPOOL_DIR || path.join(__dirname, '..', 'spool');
 fs.mkdirSync(SPOOL_DIR, { recursive: true });
@@ -70,7 +71,18 @@ async function writeBatch(b) {
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
   finally { client.release(); }
-  if (b.end) for (const fn of endListeners) setImmediate(() => { try { fn(b.match_id); } catch (_) {} });
+  if (b.end) notifyEnd(b.match_id);
+}
+
+function notifyEnd(id) {
+  for (const fn of endListeners) setImmediate(() => { try { fn(id); } catch (_) {} });
+}
+
+// Keep an in-memory copy (dashboard/recap still work when the DB is unreachable) and
+// signal match end right away instead of waiting for the DB write.
+function remember(b) {
+  try { getMatchStore().memory.ingest(b); } catch (e) { console.error('[ingest] memory copy failed', e.message); }
+  if (b.end) notifyEnd(b.match_id);
 }
 
 // Listeners must never throw into the ingest path; they run after the write, off the request.
@@ -114,7 +126,8 @@ async function replay() {
 setInterval(() => replay().catch(() => {}), 5000).unref();
 
 function enqueue(b) {
+  remember(b);
   if (queue.length > 500) { state.dropped++; return false; }   // hard cap: protect memory
   queue.push(b); setImmediate(drain); return true;
 }
-module.exports = { enqueue, state, queue, writeBatch, onMatchEnd };
+module.exports = { enqueue, remember, state, queue, writeBatch, onMatchEnd };
