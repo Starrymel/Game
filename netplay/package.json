@@ -1,0 +1,14 @@
+{
+  "name": "composure-netplay-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dumb WebSocket relay pairing exactly one host and one guest browser for two-laptop play.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

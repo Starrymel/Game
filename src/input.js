@@ -5,12 +5,34 @@ const BINDINGS = {
   2: { left: 'arrowleft', right: 'arrowright', up: 'arrowup', down: 'arrowdown', light: 'k', special: 'l' },
 };
 
+// Two-laptop play (see src/net.js): the host substitutes the guest's actual
+// keypresses here instead of reading local keys for that player. If the
+// guest's connection drops, a stale override degrades to neutral (no input)
+// rather than leaving a key stuck "held" forever.
+const REMOTE_STALE_MS = 400;
+const remote = { 1: null, 2: null }; // { input, receivedAt } | null
+
+export function setRemoteInput(playerId, input) {
+  remote[playerId] = { input, receivedAt: Date.now() };
+}
+
+export function clearRemoteInput(playerId) {
+  remote[playerId] = null;
+}
+
 export function initInput() {
   window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 }
 
+const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, light: false, special: false };
+
 export function readInput(playerId) {
+  const r = remote[playerId];
+  if (r) {
+    return Date.now() - r.receivedAt <= REMOTE_STALE_MS ? r.input : NEUTRAL_INPUT;
+  }
+
   const b = BINDINGS[playerId];
   return {
     left: keys.has(b.left),
