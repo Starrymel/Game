@@ -1,2 +1,64 @@
-/* Owner: D
-   Dashboard styles */
+/* Owner: D. Dashboard styles (light + dark via prefers-color-scheme) */
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --card: #ffffff; --line: #e3e2dc; --grid: #ececE6;
+    --text: #0b0b0b; --text-2: #52514e; --text-3: #7b7a74;
+    --p1: #2a78d6; --p2: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface: #1a1a19; --card: #232322; --line: #3a3a37; --grid: #2e2e2c;
+      --text: #ffffff; --text-2: #c3c2b7; --text-3: #94938a;
+      --p1: #3987e5; --p2: #d95926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --card: #232322; --line: #3a3a37; --grid: #2e2e2c;
+    --text: #ffffff; --text-2: #c3c2b7; --text-3: #94938a;
+    --p1: #3987e5; --p2: #d95926;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 28px; margin: 0; letter-spacing: -.01em; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select, button { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { border-color: var(--text-2); }
+  .badge { font-size: 13px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--text-2); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .versus { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; margin-bottom: 4px; }
+  .versus .name { font-size: 22px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+  .result { color: var(--text-2); font-size: 18px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .tile .label { font-size: 13px; color: var(--text-2); }
+  .tile .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 4px; }
+  .tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+  .tile .v i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .chartwrap { position: relative; }
+  #chart { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--text-2); font-family: inherit; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 4px 0 10px; font-size: 15px; }
+  .legend label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: var(--text); }
+  .legend input { accent-color: var(--text-2); }
+  .tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.18); min-width: 190px; display: none; z-index: 3; }
+  .tip b { font-variant-numeric: tabular-nums; }
+  .tip .r { display: flex; justify-content: space-between; gap: 14px; }
+  .tip .ev { color: var(--text-2); margin-top: 4px; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  #summary { white-space: pre-wrap; font-size: 18px; line-height: 1.55; margin: 0; }
+  .muted { color: var(--text-3); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-2); font-weight: 600; }
+  .hidden { display: none; }
+  #err { color: var(--text); }
+  @media (max-width: 640px) { h1 { font-size: 22px; } }
+
+  /* embed mode: shown inside the game as an overlay */
+  body.embed header h1, body.embed #matchSel { display: none; }
+  body.embed .wrap { padding-top: 12px; }

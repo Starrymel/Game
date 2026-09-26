@@ -1,3 +1,4 @@
+import './logging/logger.js'; // D: match logging + analysis overlay (must load first to catch round_start)
 import './mechanics.config.js'; // load B's overrides (no-op stub for now)
 import { initInput } from './input.js';
 import { initBiometrics } from './biometrics.js';

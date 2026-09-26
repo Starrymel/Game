@@ -1,2 +1,56 @@
-<!-- Owner: D -->
-<!-- Post-match dashboard page -->
+<!doctype html>
+<!-- Owner: D. Post-match dashboard. Standalone at /dashboard/, or embedded in the game with ?embed=1 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Composure Post-Match</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Composure &middot; Post-Match</h1>
+    <div class="controls">
+      <span id="simbadge" class="badge hidden">Mock biometrics</span>
+      <select id="matchSel" aria-label="Choose match"></select>
+      <button id="tableBtn" aria-pressed="false">Table view</button>
+    </div>
+  </header>
+
+  <div id="err" class="card hidden"></div>
+
+  <div id="main" class="hidden">
+    <div class="card">
+      <div class="versus">
+        <span class="name"><span class="swatch" style="background:var(--p1)"></span><span id="n1"></span></span>
+        <span class="name"><span class="swatch" style="background:var(--p2)"></span><span id="n2"></span></span>
+        <span class="result" id="result"></span>
+      </div>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card">
+      <h2>Health vs. heart rate</h2>
+      <div class="legend" id="legend"></div>
+      <div class="chartwrap" id="chartwrap">
+        <svg id="chart" viewBox="0 0 1000 500" role="img" aria-label="Health points and heart rate for both players over match time"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="tableCard">
+      <h2>Event log</h2>
+      <table id="evTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>Match analysis</h2>
+      <p id="summary"></p>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
