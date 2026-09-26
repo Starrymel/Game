@@ -97,11 +97,19 @@ P2: `←/→` move, `↑` jump, `↓` block (hold), `K` light attack, `L` specia
 Debug hotkeys (mock biometrics): `1`/`2` force P1/P2 "stressed", `Q`/`P` force P1/P2 "calm",
 `0` release forced state back to sine+noise.
 
-## 7. Presage status (as of hackathon hour 1)
+## 7. Presage status
 
 No browser SDK exists — platforms are iOS/Android/C++/Node.js/Electron only. The REST API
 is upload-and-poll (not live), and breathing confidence needs a 30s window, HRV needs 60s.
-Plan: small Node process using the SmartSpectra Node SDK, browser streams webcam frames to
-it over WebSocket, Node streams `{hr, breath}` back over WebSocket. Treat this as a slow
-"vibe" signal (heal rate, meter gating band), not a per-hit reactive one — mock data stays
-the primary driver of the demo even after Presage is wired up.
+Treat real biometrics as a slow "vibe" signal (heal rate, meter gating band), not a per-hit
+reactive one — mock data stays the primary driver of the demo even after Presage is wired up.
+
+**The bridge is built** — see `bridge/` (Node service running `@smartspectra/node-sdk`,
+WebSocket in: raw webcam frames, WebSocket out: `{player, hr, breath, stress, calm, source}`
+matching the biometric-sample shape in #1) and `src/presage-capture.js` (browser webcam →
+bridge). Setup and usage: `bridge/README.md`. Not yet tested against a real API key/camera —
+budget time before the demo to verify the full pipeline, not just that it compiles.
+
+`src/biometrics.js` smooths whatever arrives (mock or Presage) into a continuous per-tick
+value via `advanceBiometricsSmoothing()`, so `getBiometrics()` always updates every physics
+frame regardless of how often the real sensor actually reports.

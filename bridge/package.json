@@ -1,0 +1,16 @@
+{
+  "name": "composure-presage-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node bridge: browser webcam frames in, SmartSpectra vitals out over WebSocket.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.3.0",
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0"
+  }
+}
