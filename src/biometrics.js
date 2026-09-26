@@ -1,4 +1,4 @@
-import { startMockBiometrics, forceMockState } from './biometrics-mock.js';
+import { startMockBiometrics, stopMockBiometrics, forceMockState } from './biometrics-mock.js';
 import { startPresageBiometrics } from './biometrics-presage.js';
 import { bus } from './eventBus.js';
 
@@ -17,7 +17,14 @@ const smoothed = {
   2: { hr: 75, breath: 14, stress: 0, calm: 1, source: 'mock' },
 };
 
+let source = 'mock';
+
 bus.on('biometric_sample', (sample) => {
+  // Mock keeps running in the background (see __setBiometricsSource below),
+  // so without this gate its 10Hz updates would keep drowning out Presage's
+  // much sparser real samples -- whichever arrived most recently would win,
+  // and mock always arrives most recently.
+  if (sample.source !== source) return;
   target[sample.player] = sample;
 });
 
@@ -52,6 +59,13 @@ export function initBiometrics() {
 
 // Exposed on window so anyone (debug panel, console) can flip the source live.
 window.__setBiometricsSource = (next) => {
-  if (next === 'presage') startPresageBiometrics();
+  if (next === source) return;
+  source = next;
+  if (next === 'presage') {
+    stopMockBiometrics();
+    startPresageBiometrics();
+  } else {
+    startMockBiometrics();
+  }
 };
 window.__forceBiometricState = forceMockState; // (player, 'stressed'|'calm'|null)
