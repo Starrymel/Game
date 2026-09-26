@@ -6,10 +6,15 @@
 // Live lines use gemini-3.5-flash-lite with thinkingLevel "minimal" (lowest latency;
 // "minimal" is only valid on Flash-Lite). Override with GEMINI_LINE_MODEL.
 
-const { COMMENTARY_SYSTEM, commentaryContents } = require('./prompts');
+const {
+  COMMENTARY_SYSTEM, commentaryContents, SUMMARY_SYSTEM, SUMMARY_SCHEMA, summaryContents,
+} = require('./prompts');
+const { compactMatch, templateSummary } = require('./summarize');
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const DEFAULT_LINE_MODEL = 'gemini-3.5-flash-lite';
+// Summary isn't latency-critical: use the stronger Flash with a little thinking.
+const DEFAULT_SUMMARY_MODEL = 'gemini-3.8-flash';
 const MAX_LINE_WORDS = 15;
 
 class GeminiError extends Error {
@@ -26,6 +31,7 @@ async function generateText({
   temperature = 0.9,
   maxOutputTokens = 256,
   thinkingLevel,
+  responseSchema,
   timeoutMs = 8000,
   apiKey = process.env.GEMINI_API_KEY,
   fetchImpl = fetch,
@@ -33,6 +39,10 @@ async function generateText({
   if (!apiKey) throw new GeminiError('GEMINI_API_KEY not set', 503);
   const generationConfig = { temperature, maxOutputTokens };
   if (thinkingLevel) generationConfig.thinkingConfig = { thinkingLevel };
+  if (responseSchema) {
+    generationConfig.responseMimeType = 'application/json';
+    generationConfig.responseSchema = responseSchema;
+  }
   const body = { contents, generationConfig };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
@@ -89,4 +99,44 @@ async function generateLine(moment, { recent = [], ...opts } = {}) {
   return line;
 }
 
-module.exports = { generateText, generateLine, cleanLine, GeminiError, DEFAULT_LINE_MODEL };
+// detail: match-detail shape (see summarize.js). Always resolves: falls back to a
+// stats-based template if Gemini is unavailable or returns junk.
+// If the main model is overloaded (503s happen under demand spikes), try Flash-Lite once.
+async function generateSummary(detail, opts = {}) {
+  const compact = compactMatch(detail);
+  const models = [
+    process.env.GEMINI_SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL,
+    process.env.GEMINI_LINE_MODEL || DEFAULT_LINE_MODEL,
+  ];
+  const errors = [];
+  for (const model of [...new Set(models)]) {
+    try {
+      const text = await generateText({
+        model,
+        system: SUMMARY_SYSTEM,
+        contents: summaryContents(compact),
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+        thinkingLevel: 'low',
+        responseSchema: SUMMARY_SCHEMA,
+        timeoutMs: 12000,
+        ...opts,
+      });
+      const parsed = JSON.parse(text);
+      const clean = (x) => (typeof x === 'string' ? x.trim().replace(/\s+/g, ' ') : '');
+      const out = { headline: cleanLine(clean(parsed.headline)), analysis: clean(parsed.analysis), turningPoint: clean(parsed.turningPoint) };
+      if (!out.headline || !out.analysis) throw new GeminiError('summary missing fields', 502);
+      return { ...out, source: 'gemini', model };
+    } catch (err) {
+      errors.push(`${model}: ${err.message.slice(0, 120)}`);
+      if (err.status === 503 && /not set/.test(err.message)) break; // no key: retrying won't help
+    }
+  }
+  console.warn('[ai] summary fell back to template:', errors.join(' | '));
+  return { ...templateSummary(compact), source: 'template', error: errors.join(' | ') };
+}
+
+module.exports = {
+  generateText, generateLine, generateSummary, cleanLine, GeminiError,
+  DEFAULT_LINE_MODEL, DEFAULT_SUMMARY_MODEL,
+};
