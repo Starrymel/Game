@@ -28,6 +28,14 @@ test('passes through ko/special/meter_full/round events with priorities', () => 
     && PRIORITY.big_flinch > PRIORITY.hit);
 });
 
+test('round_end announced on time-out, suppressed after KO', () => {
+  const d = createMomentDetector();
+  assert.deepEqual(types(d.handle('round_end', { round: 1, winner: 1, t: 0 })), ['round_end']);
+  d.handle('round_start', { round: 2, t: 1 });
+  d.handle('ko', { winner: 2, loser: 1, t: 2 });
+  assert.deepEqual(d.handle('round_end', { round: 2, winner: 2, t: 2 }), []);
+});
+
 test('only big flinches become moments', () => {
   const d = createMomentDetector();
   assert.deepEqual(d.handle('flinch', { player: 2, magnitude: 0.3, t: 0 }), []);
@@ -128,7 +136,9 @@ test('fake match fixture replays through the bus and hits every moment type', ()
   replayMatchSync(bus, fixture);
 
   const got = new Set(types(seen));
-  for (const t of Object.keys(PRIORITY)) assert.ok(got.has(t), `missing ${t}`);
+  // round_end is only announced on time-outs; the fixture ends in a KO.
+  for (const t of Object.keys(PRIORITY)) if (t !== 'round_end') assert.ok(got.has(t), `missing ${t}`);
+  assert.ok(!got.has('round_end'));
 
   const ko = seen.find((m) => m.type === 'ko');
   assert.equal(ko.data.winner, 2);

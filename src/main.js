@@ -4,12 +4,16 @@ import { initBiometrics } from './biometrics.js';
 import { startPresageCapture, listCameraDevices } from './presage-capture.js';
 import { runLoop } from './game.js';
 import { render } from './render.js';
+import { bus } from './eventBus.js';
+import { initCommentary } from './commentary/index.js';
 
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
 
 initInput();
 initBiometrics();
+// Commentary must subscribe before runLoop() so it hears the first round_start.
+window.__commentary = initCommentary({ bus });
 
 runLoop({
   onRender: (match) => render(ctx, match),

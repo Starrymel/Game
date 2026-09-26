@@ -94,6 +94,8 @@ export function createMomentDetector(options = {}) {
     },
 
     round_end(p) {
+      // After a KO the KO call already says it all; only announce time-outs.
+      if (perRound.koFired) return [];
       return [moment('round_end', p.t, p.winner ?? undefined, { round: p.round, winner: p.winner })];
     },
 
