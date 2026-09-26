@@ -5,9 +5,9 @@
 // same WebSocket. src/biometrics-presage.js on the browser side already
 // expects exactly this JSON shape at ws://localhost:8787/biometrics.
 //
-// Setup: cd bridge && npm install && cp .env.example .env (fill in
-// PRESAGE_API_KEY) && npm start
-import 'dotenv/config';
+// Setup: cd bridge && npm install && npm start. PRESAGE_API_KEY is read from
+// bridge/.env, or else from the project's main .env (one file for the whole team).
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
@@ -18,6 +18,18 @@ import {
   SmartSpectraSDK, decodeMetrics, breathingMetrics, cardioMetrics,
   FrameTransform, PixelFormat,
 } from '@smartspectra/node-sdk';
+
+// Env: real environment first, then bridge/.env, then the repo's main .env. dotenv
+// never overrides a value that's already set, so earlier sources win.
+const BRIDGE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const keyFromEnv = !!process.env.PRESAGE_API_KEY;
+const envFiles = [path.join(BRIDGE_DIR, '.env'), path.join(BRIDGE_DIR, '..', '.env')];
+let keySource = keyFromEnv ? 'environment' : null;
+for (const file of envFiles) {
+  if (!fs.existsSync(file)) continue;
+  dotenv.config({ path: file, quiet: true });
+  if (!keySource && process.env.PRESAGE_API_KEY) keySource = path.relative(process.cwd(), file) || file;
+}
 
 const PORT = Number(process.env.PRESAGE_BRIDGE_PORT) || 8787;
 // Every modern browser blocks a plain ws:// connection from an https:// page
@@ -32,8 +44,10 @@ const API_KEY = process.env.PRESAGE_API_KEY;
 if (!API_KEY) {
   console.warn(
     '[presage-bridge] PRESAGE_API_KEY not set — SDK sessions will fail auth. '
-    + 'Get one at https://physiology.presagetech.com/auth/login and put it in bridge/.env',
+    + 'Get one at https://physiology.presagetech.com/auth/login and put it in the main .env (or bridge/.env)',
   );
+} else {
+  console.log(`[presage-bridge] PRESAGE_API_KEY loaded from ${keySource} (${API_KEY.slice(0, 4)}…)`);
 }
 
 // Binary frame layout sent by src/presage-capture.js, all little-endian:
@@ -151,6 +165,8 @@ function getOrCreateSession(player, broadcast) {
       if (code !== session.lastValidationCode) {
         session.lastValidationCode = code;
         console.log(`[presage-bridge] player ${player}: validation changed -> code=${code} hint=${hint}`);
+        // Tell the game too, so its camera panel can show "No face found" etc.
+        broadcast({ type: 'status', player, code, hint });
       }
     });
 
@@ -179,6 +195,7 @@ function getOrCreateSession(player, broadcast) {
   } catch (err) {
     session.failed = true;
     console.error(`[presage-bridge] player ${player} failed to start SmartSpectra session (check PRESAGE_API_KEY):`, err.message);
+    broadcast({ type: 'status', player, error: `SmartSpectra session failed: ${err.message}` });
   }
 
   return session;

@@ -10,9 +10,20 @@ extractor: it takes webcam frames over WebSocket and runs them through
 ```bash
 cd bridge
 npm install
-cp .env.example .env   # fill in PRESAGE_API_KEY from https://physiology.presagetech.com/auth/login
 npm start
 ```
+
+The key is read from the project's main `.env` (`PRESAGE_API_KEY=...`, get one at
+https://physiology.presagetech.com/auth/login). A `bridge/.env` or a real environment
+variable overrides it. On startup the bridge prints where it found the key, e.g.
+`PRESAGE_API_KEY loaded from ../.env (abcd…)`; if it says "not set", the camera will
+stream but no heart rate will ever come back.
+
+In the game, open **Presage camera setup** and click **Start camera -> Player N**.
+Only that player switches to the camera (the other keeps mock data). The panel shows
+live status per player: bridge unreachable / waiting for first reading (with the SDK's
+hint, e.g. "No face found") / current bpm. The first reading needs your face in view
+and fairly still for several seconds.
 
 Listens on `ws://localhost:8787/biometrics` by default (matches
 `src/biometrics-presage.js` on the browser side — no code change needed
