@@ -18,6 +18,7 @@ export function initCommentary({
   summarize = requestMatchSummary,
 } = {}) {
   const caption = createCaption();
+  createHistoryLink();
   const panel = createSummaryPanel();
   const recorder = createMatchRecorder();
   const announcer = createAnnouncer({
@@ -80,6 +81,25 @@ export function initCommentary({
       announcer.stop();
     },
   };
+}
+
+// Always-visible way to the dashboard (the "View round recap" button only appears
+// after a round ends).
+function createHistoryLink() {
+  if (typeof document === 'undefined') return;
+  const a = document.createElement('a');
+  a.id = 'match-history-link';
+  a.href = '/dashboard/';
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = 'Match history ↗';
+  Object.assign(a.style, {
+    position: 'fixed', top: '12px', right: '16px', zIndex: '42',
+    padding: '7px 12px', borderRadius: '8px', background: 'rgba(12, 14, 20, 0.85)',
+    boxShadow: '0 0 0 1px #2c3140', color: '#c9d1e4', font: '600 13px system-ui, sans-serif',
+    textDecoration: 'none',
+  });
+  document.body.appendChild(a);
 }
 
 function createCaption() {
