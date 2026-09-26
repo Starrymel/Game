@@ -29,8 +29,10 @@ if (typeof ai === 'function') { app.use('/api/ai', ai); console.log('[server] mo
 
 if (process.env.DEV_ROUTES !== '0') {
   app.post('/api/dev/fake-match', async (_req, res) => {
-    try { const f = fakeMatch(Date.now()); await ingest.writeBatch(f); res.json({ ok: true, match_id: f.match_id }); }
-    catch (e) { res.status(503).json({ error: e.message }); }
+    const f = fakeMatch(Date.now());
+    ingest.remember(f); // in-memory copy, so this works without a DB too
+    try { if (pool) await ingest.writeBatch(f); res.json({ ok: true, match_id: f.match_id, db: !!pool }); }
+    catch (e) { res.json({ ok: true, match_id: f.match_id, db: false, dbError: e.message }); }
   });
 }
 

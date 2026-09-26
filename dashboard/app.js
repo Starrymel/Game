@@ -20,6 +20,7 @@ async function init() {
   try {
     const r = await fetch('/api/matches'); if (!r.ok) throw new Error('HTTP ' + r.status);
     list = await r.json();
+    $('srcbadge').classList.toggle('hidden', r.headers.get('X-Match-Source') !== 'memory');
   } catch (e) { return showErr('Could not reach the backend (' + e.message + '). Is the server running?'); }
   const wantId = new URLSearchParams(location.search).get('match');
   if (!list.length && !wantId) return showErr('No matches logged yet. Play one, or POST /api/dev/fake-match to create a fake match.');
