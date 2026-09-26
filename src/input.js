@@ -20,6 +20,13 @@ export function clearRemoteInput(playerId) {
   remote[playerId] = null;
 }
 
+// Short synthetic key press (e.g. a blink = light attack). Lives only on the local input, so on the
+// guest it is sent to the host like any other keypress.
+const pulses = { 1: {}, 2: {} }; // action -> expiry time (ms)
+export function pulseInput(playerId, action, ms = 150) {
+  if (pulses[playerId]) pulses[playerId][action] = Date.now() + ms;
+}
+
 export function initInput() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, button, textarea, select')) return;
@@ -40,13 +47,16 @@ export function readInput(playerId) {
   }
 
   const b = BINDINGS[playerId];
+  const now = Date.now();
+  const p = pulses[playerId] || {};
+  const on = (a) => keys.has(b[a]) || (p[a] || 0) > now;
   return {
-    left: keys.has(b.left),
-    right: keys.has(b.right),
-    up: keys.has(b.up),
-    down: keys.has(b.down),
-    light: keys.has(b.light),
-    special: keys.has(b.special),
+    left: on('left'),
+    right: on('right'),
+    up: on('up'),
+    down: on('down'),
+    light: on('light'),
+    special: on('special'),
   };
 }
 

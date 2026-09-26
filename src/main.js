@@ -9,6 +9,7 @@ import { bus } from './eventBus.js';
 import { initCommentary } from './commentary/index.js';
 import { initDebugPanel } from './ui/debugPanel.js';
 import { initPresagePanel } from './ui/presagePanel.js';
+import { initBlinkLab } from './ui/blinkLab.js';
 import { connectNet } from './net.js';
 import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
 
@@ -44,7 +45,10 @@ window.__commentary = initCommentary({ bus });
 // Where the Presage bridge is: on the host laptop when on the same Wi-Fi (?host=<address>), or on THIS laptop
 // (localhost) when the page is the hosted https site. See netconfig.js.
 const bridgeWsUrl = bridgeUrlFor(location, params);
-initPresagePanel({ wsUrl: bridgeWsUrl });
+// ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
+const res = Number(params.get('presageRes'));
+initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
+if (params.get('blinklab')) initBlinkLab({ player });
 
 const match = runLoop({
   onRender: (match) => render(ctx, match),

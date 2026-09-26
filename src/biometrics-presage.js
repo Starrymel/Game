@@ -58,6 +58,8 @@ function connect() {
     try { msg = JSON.parse(evt.data); } catch { return; }
     const s = state[msg?.player];
     if (!s) return;
+    // Blink lab: face events (only sent when the bridge runs with PRESAGE_FACE=1).
+    if (msg.type === 'face') { bus.emit('face_sample', msg); return; }
     // Bridge status updates (SDK validation hints, session errors) aren't readings.
     if (msg.type === 'status') {
       lastHint[msg.player] = msg.hint ?? null;

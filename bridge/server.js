@@ -14,8 +14,9 @@ import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { newFaceState, extractFaceEvents } from './faceEvents.js';
 import {
-  SmartSpectraSDK, decodeMetrics, breathingMetrics, cardioMetrics,
+  SmartSpectraSDK, decodeMetrics, breathingMetrics, cardioMetrics, faceMetrics,
   FrameTransform, PixelFormat,
 } from '@smartspectra/node-sdk';
 
@@ -40,6 +41,9 @@ const PORT = Number(process.env.PRESAGE_BRIDGE_PORT) || 8787;
 // an http:// page, unaffected by this) keeps working unchanged.
 const WSS_PORT = Number(process.env.PRESAGE_BRIDGE_WSS_PORT) || 8790;
 const API_KEY = process.env.PRESAGE_API_KEY;
+// Blink lab: also request face metrics (blinks, talking, expression). Off by default so normal play
+// doesn't use extra Presage credits. Start the bridge with PRESAGE_FACE=1 npm start.
+const FACE = process.env.PRESAGE_FACE === '1';
 
 if (!API_KEY) {
   console.warn(
@@ -108,13 +112,13 @@ function getOrCreateSession(player, broadcast) {
 
   // Cache the session object before any SDK call so a failed start() below
   // doesn't retry (and re-throw) on every subsequent frame for this player.
-  session = { sdk: null, restingHr: null, failed: false, frameCount: 0 };
+  session = { sdk: null, restingHr: null, failed: false, frameCount: 0, face: newFaceState() };
   sessions.set(player, session);
 
   try {
     const sdk = new SmartSpectraSDK({
       apiKey: API_KEY,
-      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      requestedMetrics: [...breathingMetrics, ...cardioMetrics, ...(FACE ? faceMetrics : [])],
     });
     sdk.useCustomInput(FrameTransform.kNone);
     sdk.start(); // throws synchronously on auth/setup failure, not just an 'error' event
@@ -122,6 +126,14 @@ function getOrCreateSession(player, broadcast) {
     sdk.on('metrics', (buf) => {
       const metrics = decodeMetrics(buf);
       if (Buffer.isBuffer(metrics)) return; // undecoded buffer, nothing usable yet
+
+      if (FACE) {
+        const ev = extractFaceEvents(metrics, session.face, Date.now());
+        if (ev && (ev.blink || ev.talking != null || ev.expression)) {
+          if (ev.blink) console.log(`[presage-bridge] player ${player}: BLINK #${ev.blink.count} (sdk delay ${ev.blink.delayMs} ms, stable=${ev.blink.stable})`);
+          broadcast({ type: 'face', player, t: Date.now(), ...ev });
+        }
+      }
 
       const hr = metrics.cardio?.pulseRate?.at(-1)?.value;
       const breath = metrics.breathing?.rate?.at(-1)?.value;

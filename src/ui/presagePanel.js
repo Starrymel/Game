@@ -33,7 +33,7 @@ export function describePresage(player, { source, streaming, status, hr, now = D
   return `Player ${player}: ${Math.round(hr)} bpm from camera (updated ${age}s ago)`;
 }
 
-export function initPresagePanel({ wsUrl }) {
+export function initPresagePanel({ wsUrl, capture = {} }) {
   const panel = document.createElement('details');
   panel.id = 'presage-panel';
   panel.innerHTML = `
@@ -96,7 +96,7 @@ export function initPresagePanel({ wsUrl }) {
       // Only this player switches to the camera; readings come from the same
       // bridge the frames go to.
       setBiometricsSource('presage', { player, wsUrl });
-      await startPresageCapture(player, { deviceId: select.value || undefined, wsUrl });
+      await startPresageCapture(player, { deviceId: select.value || undefined, wsUrl, ...capture });
       streaming[player] = true;
       status.textContent = `Streaming this camera for player ${player} to ${wsUrl}.`;
     } catch (e) {
