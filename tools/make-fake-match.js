@@ -9,6 +9,7 @@
 // low HP, heals, P1 panics, P2 lands a combo + special, overtakes, and KOs P1.
 
 import { writeFileSync } from 'node:fs';
+import { mechanicsConfig } from '../src/mechanics.config.js';
 
 const T0 = 1700000000000;
 const STEP = 250;
@@ -33,27 +34,34 @@ const meter = {
   1: [[0, 0], [8000, 100], [9000, 100], [9001, 0], [37000, 30]],
   2: [[0, 0], [28000, 100], [30000, 100], [30001, 0], [37000, 20]],
 };
-// P2 heals 1.5 HP/s between these times.
-const heal = { 2: { from: 19000, to: 32000, perSec: 1.5 } };
+// P2 heals between these times at a rate inside B's real range (heal.base .. heal.max).
+const heal = { 2: { from: 19000, to: 32000, perSec: 1.2 } };
 
-// Scripted actions at exact ms (multiples of STEP).
+// Scripted actions at exact ms (multiples of STEP). Flinch magnitude is computed
+// from the defender's stress with B's formula, so it stays inside the real range.
 const hits = [
   // P1 combo on P2
-  [2000, 1, 'light', 10, 0.5],
-  [3000, 1, 'light', 10, 0.5],
-  [4000, 1, 'light', 10, 0.5],
-  [9000, 1, 'special', 25, 0.9],
-  [12000, 1, 'light', 10, 0.45],
-  [14500, 1, 'light', 10, 0.45],
+  [2000, 1, 'light', 10],
+  [3000, 1, 'light', 10],
+  [4000, 1, 'light', 10],
+  [9000, 1, 'special', 25],
+  [12000, 1, 'light', 10],
+  [14500, 1, 'light', 10],
   // P2 answers
-  [24000, 2, 'light', 12, 0.55],
-  [25000, 2, 'light', 12, 0.65],
-  [26000, 2, 'light', 12, 0.8],
-  [30000, 2, 'special', 30, 0.95],
-  [33000, 2, 'light', 12, 0.8],
-  [34500, 2, 'light', 12, 0.8],
-  [37000, 2, 'light', 12, 0.85],
+  [24000, 2, 'light', 12],
+  [25000, 2, 'light', 12],
+  [26000, 2, 'light', 12],
+  [30000, 2, 'special', 30],
+  [33000, 2, 'light', 12],
+  [34500, 2, 'light', 12],
+  [37000, 2, 'light', 12],
 ];
+
+// Same as the engine: magnitude = flinch multiplier / 2, multiplier from stress (B).
+function flinchMagnitude(stress) {
+  const { min, max } = mechanicsConfig.flinch;
+  return Math.round(((min + (max - min) * stress) / 2) * 100) / 100;
+}
 const meterFull = [[8000, 1], [28000, 2]];
 
 function lerp(frames, ms) {
@@ -87,12 +95,12 @@ export function makeFakeMatch() {
   for (let ms = 0; ms <= END && !over; ms += STEP) {
     for (const [at, player] of meterFull) if (at === ms) push(ms, 'meter_full', { player });
 
-    for (const [at, attacker, kind, damage, magnitude] of hits) {
+    for (const [at, attacker, kind, damage] of hits) {
       if (at !== ms || over) continue;
       const defender = attacker === 1 ? 2 : 1;
       hp[defender] = Math.max(0, hp[defender] - damage);
       push(ms, 'hit', { attacker, defender, damage, kind });
-      push(ms, 'flinch', { player: defender, magnitude });
+      push(ms, 'flinch', { player: defender, magnitude: flinchMagnitude(lerp(bio[defender].stress, ms)) });
       if (kind === 'special') push(ms, 'special', { player: attacker });
       if (hp[defender] === 0) {
         over = true;

@@ -43,7 +43,7 @@ test('recorder produces the match-detail shape with victim-labelled events', () 
 test('compactMatch captures composure story and stays small', () => {
   const c = compactMatch(recordFixture());
   assert.equal(c.winner, 2);
-  assert.deepEqual(c.finalHp, { 1: 0, 2: 45 }); // 25 HP + 13s of healing at 1.5/s
+  assert.deepEqual(c.finalHp, { 1: 0, 2: 41 }); // 25 HP + 13s of healing at 1.2/s
   assert.equal(c.comeback.player, 2);
   assert.equal(c.comeback.wasBehindBy, 75);
   assert.ok(c.players[1].hrPeak >= 120, 'P1 panicked late');

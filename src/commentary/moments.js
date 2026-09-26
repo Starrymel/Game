@@ -9,6 +9,8 @@
 //   { type, priority, t, player?, data, context }
 //   context = { round, timeRemaining, players: [{ id, hp, maxHp, meter, hr, breath, stress, calm }] }
 
+import { mechanicsConfig } from '../mechanics.config.js';
+
 export const PRIORITY = {
   ko: 100,
   special: 90,
@@ -24,12 +26,31 @@ export const PRIORITY = {
   hit: 10,
 };
 
+// Flinch and heal cutoffs follow B's formulas (src/mechanics.config.js) so they stay
+// reachable if B retunes:
+//   flinch magnitude on the bus = (flinch.min + (flinch.max - flinch.min) * stress) / 2
+//     -> with min 0.8 / max 1.2 that's 0.40 (calm) .. 0.60 (max stress)
+//   heal rate = 0 below calm threshold, else heal.base .. heal.max HP/s (1.0 .. 1.4)
+// Mock stress idles at 0.15..0.5; the "stressed" hotkey (and real panic) puts it at
+// 0.6+, so 0.55 separates "stressed" from normal play (magnitude 0.51 with B's numbers).
+const BIG_FLINCH_STRESS = 0.55;
+const HEAL_STREAK_SECONDS = 5;    // this long healing at base rate, uninterrupted
+
+export function thresholdsFrom(config = mechanicsConfig) {
+  const { min, max } = config.flinch;
+  return {
+    bigFlinchMagnitude: round2((min + (max - min) * BIG_FLINCH_STRESS) / 2),
+    // 90% of base-rate healing over the window, so frame timing at the window edge
+    // can't make a real 5s streak miss.
+    healStreakHp: round2(config.heal.base * HEAL_STREAK_SECONDS * 0.9),
+    healStreakWindowMs: HEAL_STREAK_SECONDS * 1000,
+  };
+}
+
 export const DEFAULTS = {
-  bigFlinchMagnitude: 0.6,    // flinch at/above this is worth calling out
+  ...thresholdsFrom(),        // bigFlinchMagnitude, healStreakHp, healStreakWindowMs
   comboHits: 3,               // consecutive hits by one attacker...
   comboWindowMs: 2500,        // ...each within this gap
-  healStreakHp: 8,            // healed at least this much...
-  healStreakWindowMs: 6000,   // ...within this window, without being hit
   healStreakCooldownMs: 10000,
   comebackDeficit: 30,        // was behind by >= this much HP...
   comebackRecover: 0,         // ...and is now ahead by >= this (0 = tied or better)
