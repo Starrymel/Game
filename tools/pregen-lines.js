@@ -38,7 +38,7 @@ export const clipName = (text) => `${createHash('sha1').update(text).digest('hex
 export async function pregenerate({ outDir = OUT_DIR, force = false, ttsBuffer = elevenlabs.ttsBuffer, log = console.log } = {}) {
   mkdirSync(outDir, { recursive: true });
   const manifestPath = join(outDir, 'manifest.json');
-  const voice = process.env.ELEVENLABS_VOICE_ID || elevenlabs.DEFAULT_VOICE;
+  const voice = elevenlabs.voiceId();
   const model = process.env.ELEVENLABS_MODEL_ID || elevenlabs.DEFAULT_MODEL;
   const old = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
   const sameVoice = old && old.voice === voice && old.model === model;
@@ -63,7 +63,8 @@ export async function pregenerate({ outDir = OUT_DIR, force = false, ttsBuffer =
       if (err.status === 503) break; // no key: no point continuing
     }
   }
-  writeFileSync(manifestPath, JSON.stringify({ voice, model, lines }, null, 1) + '\n');
+  // voiceId() may have fallen back to the default voice mid-run (paid-only voice).
+  writeFileSync(manifestPath, JSON.stringify({ voice: elevenlabs.voiceId(), model, lines }, null, 1) + '\n');
   return { total: Object.keys(lines).length, made, failed };
 }
 

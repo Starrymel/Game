@@ -74,6 +74,15 @@ async function generateText({
   return text;
 }
 
+// Opens the TLS connection and wakes the model route without spending tokens
+// (models.get is free). Called at page load / round start so the first real line isn't cold.
+async function warm({ apiKey = process.env.GEMINI_API_KEY, fetchImpl = fetch } = {}) {
+  if (!apiKey) return false;
+  const model = process.env.GEMINI_LINE_MODEL || DEFAULT_LINE_MODEL;
+  const res = await fetchImpl(`${API_BASE}/${model}`, { headers: { 'x-goog-api-key': apiKey } });
+  return res.ok;
+}
+
 // Makes model output safe to speak: one line, no wrapping quotes/markdown, word cap.
 function cleanLine(text) {
   let s = text.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
@@ -137,6 +146,6 @@ async function generateSummary(detail, opts = {}) {
 }
 
 module.exports = {
-  generateText, generateLine, generateSummary, cleanLine, GeminiError,
+  generateText, generateLine, generateSummary, cleanLine, warm, GeminiError,
   DEFAULT_LINE_MODEL, DEFAULT_SUMMARY_MODEL,
 };

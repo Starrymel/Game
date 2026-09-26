@@ -39,7 +39,9 @@ export function initCommentary({
 
   let round = 0;
   let summaryTimer = null;
+  lineSource?.warm?.();
   const offRoundStart = bus.on('round_start', () => {
+    lineSource?.warm?.();
     round += 1;
     clearTimeout(summaryTimer);
     panel.hide();
@@ -67,6 +69,8 @@ export function initCommentary({
     player,
     recorder,
     panel,
+    // Real event -> audio-playing latency from this browser session.
+    latency: () => player.latencyReport?.() ?? null,
     stop() {
       listener.stop();
       recOffs.forEach((off) => off());
