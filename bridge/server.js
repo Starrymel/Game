@@ -8,6 +8,11 @@
 // Setup: cd bridge && npm install && cp .env.example .env (fill in
 // PRESAGE_API_KEY) && npm start
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import https from 'node:https';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
   SmartSpectraSDK, decodeMetrics, breathingMetrics, cardioMetrics,
@@ -15,6 +20,13 @@ import {
 } from '@smartspectra/node-sdk';
 
 const PORT = Number(process.env.PRESAGE_BRIDGE_PORT) || 8787;
+// Every modern browser blocks a plain ws:// connection from an https:// page
+// as mixed content -- even to localhost (confirmed: open Chromium issue
+// #40386732, Firefox bug 1376309, reproduces in Safari too). A deployed
+// HTTPS game page (e.g. on Render) needs the local bridge to speak wss://
+// instead, on a separate port so the plain ws:// path (same-Wifi play from
+// an http:// page, unaffected by this) keeps working unchanged.
+const WSS_PORT = Number(process.env.PRESAGE_BRIDGE_WSS_PORT) || 8790;
 const API_KEY = process.env.PRESAGE_API_KEY;
 
 if (!API_KEY) {
@@ -27,6 +39,33 @@ if (!API_KEY) {
 // Binary frame layout sent by src/presage-capture.js, all little-endian:
 //   uint32 player | uint32 width | uint32 height | float64 timestampUs | RGBA pixel bytes
 const HEADER_BYTES = 20;
+
+// Self-signed cert for the wss:// listener, generated once per machine and
+// cached on disk (gitignored -- see bridge/.gitignore). The browser will
+// show a certificate warning the first time; that's expected for any local
+// HTTPS dev server. Visit https://localhost:<WSS_PORT> directly once and
+// accept it (Safari: "visit this website"; Chrome: Advanced -> Proceed),
+// then the game page's wss:// connection to the same origin will work.
+const CERT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'certs');
+const KEY_PATH = path.join(CERT_DIR, 'key.pem');
+const CERT_PATH = path.join(CERT_DIR, 'cert.pem');
+
+function ensureSelfSignedCert() {
+  if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) return;
+  fs.mkdirSync(CERT_DIR, { recursive: true });
+  try {
+    execFileSync('openssl', [
+      'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '825',
+      '-keyout', KEY_PATH, '-out', CERT_PATH, '-subj', '/CN=localhost',
+    ], { stdio: 'pipe' });
+    console.log(`[presage-bridge] generated a self-signed cert at ${CERT_DIR}`);
+  } catch (err) {
+    console.warn(
+      '[presage-bridge] could not generate a self-signed cert (is openssl installed?) '
+      + '-- the wss:// listener for hosted-HTTPS play will not start:', err.message,
+    );
+  }
+}
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -145,17 +184,20 @@ function getOrCreateSession(player, broadcast) {
   return session;
 }
 
-const wss = new WebSocketServer({ port: PORT, path: '/biometrics' });
-console.log(`[presage-bridge] listening on ws://localhost:${PORT}/biometrics`);
+// Both listeners share the same sessions/broadcast -- a player's frames
+// might come in over either one depending on which page loaded the panel.
+const allServers = []; // WebSocketServer instances currently broadcasting
 
 function broadcast(payload) {
   const msg = JSON.stringify(payload);
-  wss.clients.forEach((client) => {
-    if (client.readyState === client.OPEN) client.send(msg);
-  });
+  for (const server of allServers) {
+    server.clients.forEach((client) => {
+      if (client.readyState === client.OPEN) client.send(msg);
+    });
+  }
 }
 
-wss.on('connection', (ws) => {
+function handleConnection(ws) {
   console.log('[presage-bridge] browser connected');
   const seenPlayers = new Set(); // which players this specific connection has sent frames for
 
@@ -198,7 +240,24 @@ wss.on('connection', (ws) => {
     // real-world gap is exactly what triggers kTimestampGap.
     for (const player of seenPlayers) destroySession(player);
   });
-});
+}
+
+const wss = new WebSocketServer({ port: PORT, path: '/biometrics' });
+wss.on('connection', handleConnection);
+allServers.push(wss);
+console.log(`[presage-bridge] listening on ws://localhost:${PORT}/biometrics`);
+
+ensureSelfSignedCert();
+if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
+  const httpsServer = https.createServer({ key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PATH) });
+  const wssSecure = new WebSocketServer({ server: httpsServer, path: '/biometrics' });
+  wssSecure.on('connection', handleConnection);
+  allServers.push(wssSecure);
+  httpsServer.listen(WSS_PORT, () => {
+    console.log(`[presage-bridge] listening on wss://localhost:${WSS_PORT}/biometrics (self-signed -- `
+      + `visit https://localhost:${WSS_PORT} once and accept the certificate warning before using it from the game)`);
+  });
+}
 
 process.on('SIGINT', () => {
   for (const { sdk } of sessions.values()) sdk.destroy();

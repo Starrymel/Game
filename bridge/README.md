@@ -16,7 +16,26 @@ npm start
 
 Listens on `ws://localhost:8787/biometrics` by default (matches
 `src/biometrics-presage.js` on the browser side — no code change needed
-there).
+there). It also starts a `wss://localhost:8790/biometrics` listener with a
+self-signed cert generated automatically on first run.
+
+### Using the deployed (HTTPS) game site
+
+Every browser blocks a plain `ws://` connection from an `https://` page as
+mixed content — even to `localhost` (confirmed: open Chromium issue
+[#40386732](https://issues.chromium.org/issues/40386732), Firefox
+[bug 1376309](https://bugzilla.mozilla.org/show_bug.cgi?id=1376309),
+reproduces in Safari too). So if you're playing on a deployed HTTPS site
+(e.g. Render) rather than a local `http://` page, the game will try to
+reach the bridge's **wss://** port instead — which needs one manual step
+per laptop, the first time only:
+
+1. Run the bridge as usual (`npm start` in this folder).
+2. Visit `https://localhost:8790` directly in the same browser you'll play
+   in, and click through the certificate warning (Safari: "visit this
+   website"; Chrome: "Advanced" → "Proceed to localhost"). This is expected
+   and normal for any local HTTPS dev server with a self-signed cert.
+3. Reload the game page — its camera panel will now be able to connect.
 
 ## Using it from the game
 

@@ -22,15 +22,19 @@ test('hosted https site: relay is the site itself over wss', () => {
   assert.equal(relayUrlFor(https(), q('role=host')), 'wss://composure.onrender.com/netplay');
 });
 
-test('hosted https site: each laptop uses its OWN bridge on localhost', () => {
-  assert.equal(bridgeUrlFor(https(), q('role=host')), 'ws://localhost:8787/biometrics');
+test('hosted https site: each laptop uses its OWN bridge on localhost, over wss', () => {
+  // Plain ws:// from an https page is blocked as mixed content in every
+  // browser, even to localhost -- so this must be wss:// on the bridge's
+  // separate TLS port, not ws://.
+  assert.equal(bridgeUrlFor(https(), q('role=host')), 'wss://localhost:8790/biometrics');
   // ?host= must not send camera video over the internet
-  assert.equal(bridgeUrlFor(https(), q('role=guest&host=172.20.10.10')), 'ws://localhost:8787/biometrics');
+  assert.equal(bridgeUrlFor(https(), q('role=guest&host=172.20.10.10')), 'wss://localhost:8790/biometrics');
 });
 
-test('overrides: relayPort, bridgePort, bridge, room', () => {
+test('overrides: relayPort, bridgePort, bridgeWssPort, bridge, room', () => {
   assert.equal(relayUrlFor(http(), q('relayPort=3000')), 'ws://172.20.10.10:3000/netplay');
   assert.equal(bridgeUrlFor(http(), q('bridgePort=9000')), 'ws://172.20.10.10:9000/biometrics');
+  assert.equal(bridgeUrlFor(https(), q('bridgeWssPort=9443')), 'wss://localhost:9443/biometrics');
   assert.equal(bridgeUrlFor(https(), q('bridge=ws://localhost:9999/biometrics')), 'ws://localhost:9999/biometrics');
   assert.equal(relayUrlFor(https(), q('room=team 1')), 'wss://composure.onrender.com/netplay?room=team%201');
 });
