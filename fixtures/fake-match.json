@@ -613,7 +613,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.5,
+    "magnitude": 0.48,
     "t": 1700000002000
    }
   },
@@ -925,7 +925,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.5,
+    "magnitude": 0.48,
     "t": 1700000003000
    }
   },
@@ -1237,7 +1237,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.5,
+    "magnitude": 0.48,
     "t": 1700000004000
    }
   },
@@ -2725,7 +2725,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.9,
+    "magnitude": 0.48,
     "t": 1700000009000
    }
   },
@@ -3629,7 +3629,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.45,
+    "magnitude": 0.58,
     "t": 1700000012000
    }
   },
@@ -4379,7 +4379,7 @@
    "type": "flinch",
    "payload": {
     "player": 2,
-    "magnitude": 0.45,
+    "magnitude": 0.56,
     "t": 1700000014500
    }
   },
@@ -5702,7 +5702,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000019000
    }
   },
@@ -5759,7 +5759,7 @@
      },
      {
       "id": 2,
-      "hp": 25.38,
+      "hp": 25.3,
       "maxHp": 100,
       "meter": 68,
       "maxMeter": 100,
@@ -5784,7 +5784,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000019250
    }
   },
@@ -5841,7 +5841,7 @@
      },
      {
       "id": 2,
-      "hp": 25.75,
+      "hp": 25.6,
       "maxHp": 100,
       "meter": 69,
       "maxMeter": 100,
@@ -5866,7 +5866,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000019500
    }
   },
@@ -5923,7 +5923,7 @@
      },
      {
       "id": 2,
-      "hp": 26.13,
+      "hp": 25.9,
       "maxHp": 100,
       "meter": 70,
       "maxMeter": 100,
@@ -5948,7 +5948,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000019750
    }
   },
@@ -6005,7 +6005,7 @@
      },
      {
       "id": 2,
-      "hp": 26.5,
+      "hp": 26.2,
       "maxHp": 100,
       "meter": 71,
       "maxMeter": 100,
@@ -6030,7 +6030,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000020000
    }
   },
@@ -6087,7 +6087,7 @@
      },
      {
       "id": 2,
-      "hp": 26.88,
+      "hp": 26.5,
       "maxHp": 100,
       "meter": 71,
       "maxMeter": 100,
@@ -6112,7 +6112,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000020250
    }
   },
@@ -6169,7 +6169,7 @@
      },
      {
       "id": 2,
-      "hp": 27.25,
+      "hp": 26.8,
       "maxHp": 100,
       "meter": 72,
       "maxMeter": 100,
@@ -6194,7 +6194,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000020500
    }
   },
@@ -6251,7 +6251,7 @@
      },
      {
       "id": 2,
-      "hp": 27.63,
+      "hp": 27.1,
       "maxHp": 100,
       "meter": 73,
       "maxMeter": 100,
@@ -6276,7 +6276,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000020750
    }
   },
@@ -6333,7 +6333,7 @@
      },
      {
       "id": 2,
-      "hp": 28,
+      "hp": 27.4,
       "maxHp": 100,
       "meter": 74,
       "maxMeter": 100,
@@ -6358,7 +6358,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000021000
    }
   },
@@ -6415,7 +6415,7 @@
      },
      {
       "id": 2,
-      "hp": 28.38,
+      "hp": 27.7,
       "maxHp": 100,
       "meter": 75,
       "maxMeter": 100,
@@ -6440,7 +6440,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000021250
    }
   },
@@ -6497,7 +6497,7 @@
      },
      {
       "id": 2,
-      "hp": 28.75,
+      "hp": 28,
       "maxHp": 100,
       "meter": 76,
       "maxMeter": 100,
@@ -6522,7 +6522,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000021500
    }
   },
@@ -6579,7 +6579,7 @@
      },
      {
       "id": 2,
-      "hp": 29.13,
+      "hp": 28.3,
       "maxHp": 100,
       "meter": 77,
       "maxMeter": 100,
@@ -6604,7 +6604,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000021750
    }
   },
@@ -6661,7 +6661,7 @@
      },
      {
       "id": 2,
-      "hp": 29.5,
+      "hp": 28.6,
       "maxHp": 100,
       "meter": 78,
       "maxMeter": 100,
@@ -6686,7 +6686,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000022000
    }
   },
@@ -6743,7 +6743,7 @@
      },
      {
       "id": 2,
-      "hp": 29.88,
+      "hp": 28.9,
       "maxHp": 100,
       "meter": 79,
       "maxMeter": 100,
@@ -6768,7 +6768,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000022250
    }
   },
@@ -6825,7 +6825,7 @@
      },
      {
       "id": 2,
-      "hp": 30.25,
+      "hp": 29.2,
       "maxHp": 100,
       "meter": 79,
       "maxMeter": 100,
@@ -6850,7 +6850,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000022500
    }
   },
@@ -6907,7 +6907,7 @@
      },
      {
       "id": 2,
-      "hp": 30.63,
+      "hp": 29.5,
       "maxHp": 100,
       "meter": 80,
       "maxMeter": 100,
@@ -6932,7 +6932,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000022750
    }
   },
@@ -6989,7 +6989,7 @@
      },
      {
       "id": 2,
-      "hp": 31,
+      "hp": 29.8,
       "maxHp": 100,
       "meter": 81,
       "maxMeter": 100,
@@ -7014,7 +7014,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000023000
    }
   },
@@ -7071,7 +7071,7 @@
      },
      {
       "id": 2,
-      "hp": 31.38,
+      "hp": 30.1,
       "maxHp": 100,
       "meter": 82,
       "maxMeter": 100,
@@ -7096,7 +7096,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000023250
    }
   },
@@ -7153,7 +7153,7 @@
      },
      {
       "id": 2,
-      "hp": 31.75,
+      "hp": 30.4,
       "maxHp": 100,
       "meter": 83,
       "maxMeter": 100,
@@ -7178,7 +7178,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000023500
    }
   },
@@ -7235,7 +7235,7 @@
      },
      {
       "id": 2,
-      "hp": 32.13,
+      "hp": 30.7,
       "maxHp": 100,
       "meter": 84,
       "maxMeter": 100,
@@ -7260,7 +7260,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000023750
    }
   },
@@ -7317,7 +7317,7 @@
      },
      {
       "id": 2,
-      "hp": 32.5,
+      "hp": 31,
       "maxHp": 100,
       "meter": 85,
       "maxMeter": 100,
@@ -7353,7 +7353,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.55,
+    "magnitude": 0.57,
     "t": 1700000024000
    }
   },
@@ -7362,7 +7362,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000024000
    }
   },
@@ -7419,7 +7419,7 @@
      },
      {
       "id": 2,
-      "hp": 32.88,
+      "hp": 31.3,
       "maxHp": 100,
       "meter": 86,
       "maxMeter": 100,
@@ -7444,7 +7444,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000024250
    }
   },
@@ -7501,7 +7501,7 @@
      },
      {
       "id": 2,
-      "hp": 33.25,
+      "hp": 31.6,
       "maxHp": 100,
       "meter": 87,
       "maxMeter": 100,
@@ -7526,7 +7526,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000024500
    }
   },
@@ -7583,7 +7583,7 @@
      },
      {
       "id": 2,
-      "hp": 33.63,
+      "hp": 31.9,
       "maxHp": 100,
       "meter": 88,
       "maxMeter": 100,
@@ -7608,7 +7608,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000024750
    }
   },
@@ -7665,7 +7665,7 @@
      },
      {
       "id": 2,
-      "hp": 34,
+      "hp": 32.2,
       "maxHp": 100,
       "meter": 88,
       "maxMeter": 100,
@@ -7701,7 +7701,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.65,
+    "magnitude": 0.57,
     "t": 1700000025000
    }
   },
@@ -7710,7 +7710,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000025000
    }
   },
@@ -7767,7 +7767,7 @@
      },
      {
       "id": 2,
-      "hp": 34.38,
+      "hp": 32.5,
       "maxHp": 100,
       "meter": 89,
       "maxMeter": 100,
@@ -7792,7 +7792,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000025250
    }
   },
@@ -7849,7 +7849,7 @@
      },
      {
       "id": 2,
-      "hp": 34.75,
+      "hp": 32.8,
       "maxHp": 100,
       "meter": 90,
       "maxMeter": 100,
@@ -7874,7 +7874,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000025500
    }
   },
@@ -7931,7 +7931,7 @@
      },
      {
       "id": 2,
-      "hp": 35.13,
+      "hp": 33.1,
       "maxHp": 100,
       "meter": 91,
       "maxMeter": 100,
@@ -7956,7 +7956,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000025750
    }
   },
@@ -8013,7 +8013,7 @@
      },
      {
       "id": 2,
-      "hp": 35.5,
+      "hp": 33.4,
       "maxHp": 100,
       "meter": 92,
       "maxMeter": 100,
@@ -8049,7 +8049,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.8,
+    "magnitude": 0.57,
     "t": 1700000026000
    }
   },
@@ -8058,7 +8058,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000026000
    }
   },
@@ -8115,7 +8115,7 @@
      },
      {
       "id": 2,
-      "hp": 35.88,
+      "hp": 33.7,
       "maxHp": 100,
       "meter": 93,
       "maxMeter": 100,
@@ -8140,7 +8140,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000026250
    }
   },
@@ -8197,7 +8197,7 @@
      },
      {
       "id": 2,
-      "hp": 36.25,
+      "hp": 34,
       "maxHp": 100,
       "meter": 94,
       "maxMeter": 100,
@@ -8222,7 +8222,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000026500
    }
   },
@@ -8279,7 +8279,7 @@
      },
      {
       "id": 2,
-      "hp": 36.63,
+      "hp": 34.3,
       "maxHp": 100,
       "meter": 95,
       "maxMeter": 100,
@@ -8304,7 +8304,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000026750
    }
   },
@@ -8361,7 +8361,7 @@
      },
      {
       "id": 2,
-      "hp": 37,
+      "hp": 34.6,
       "maxHp": 100,
       "meter": 96,
       "maxMeter": 100,
@@ -8386,7 +8386,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000027000
    }
   },
@@ -8443,7 +8443,7 @@
      },
      {
       "id": 2,
-      "hp": 37.38,
+      "hp": 34.9,
       "maxHp": 100,
       "meter": 96,
       "maxMeter": 100,
@@ -8468,7 +8468,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000027250
    }
   },
@@ -8525,7 +8525,7 @@
      },
      {
       "id": 2,
-      "hp": 37.75,
+      "hp": 35.2,
       "maxHp": 100,
       "meter": 97,
       "maxMeter": 100,
@@ -8550,7 +8550,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000027500
    }
   },
@@ -8607,7 +8607,7 @@
      },
      {
       "id": 2,
-      "hp": 38.13,
+      "hp": 35.5,
       "maxHp": 100,
       "meter": 98,
       "maxMeter": 100,
@@ -8632,7 +8632,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000027750
    }
   },
@@ -8689,7 +8689,7 @@
      },
      {
       "id": 2,
-      "hp": 38.5,
+      "hp": 35.8,
       "maxHp": 100,
       "meter": 99,
       "maxMeter": 100,
@@ -8722,7 +8722,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000028000
    }
   },
@@ -8779,7 +8779,7 @@
      },
      {
       "id": 2,
-      "hp": 38.88,
+      "hp": 36.1,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -8804,7 +8804,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000028250
    }
   },
@@ -8861,7 +8861,7 @@
      },
      {
       "id": 2,
-      "hp": 39.25,
+      "hp": 36.4,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -8886,7 +8886,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000028500
    }
   },
@@ -8943,7 +8943,7 @@
      },
      {
       "id": 2,
-      "hp": 39.63,
+      "hp": 36.7,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -8968,7 +8968,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000028750
    }
   },
@@ -9025,7 +9025,7 @@
      },
      {
       "id": 2,
-      "hp": 40,
+      "hp": 37,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9050,7 +9050,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000029000
    }
   },
@@ -9107,7 +9107,7 @@
      },
      {
       "id": 2,
-      "hp": 40.38,
+      "hp": 37.3,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9132,7 +9132,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000029250
    }
   },
@@ -9189,7 +9189,7 @@
      },
      {
       "id": 2,
-      "hp": 40.75,
+      "hp": 37.6,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9214,7 +9214,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000029500
    }
   },
@@ -9271,7 +9271,7 @@
      },
      {
       "id": 2,
-      "hp": 41.13,
+      "hp": 37.9,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9296,7 +9296,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000029750
    }
   },
@@ -9353,7 +9353,7 @@
      },
      {
       "id": 2,
-      "hp": 41.5,
+      "hp": 38.2,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9389,7 +9389,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.95,
+    "magnitude": 0.58,
     "t": 1700000030000
    }
   },
@@ -9406,7 +9406,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000030000
    }
   },
@@ -9463,7 +9463,7 @@
      },
      {
       "id": 2,
-      "hp": 41.88,
+      "hp": 38.5,
       "maxHp": 100,
       "meter": 100,
       "maxMeter": 100,
@@ -9488,7 +9488,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000030250
    }
   },
@@ -9545,7 +9545,7 @@
      },
      {
       "id": 2,
-      "hp": 42.25,
+      "hp": 38.8,
       "maxHp": 100,
       "meter": 1,
       "maxMeter": 100,
@@ -9570,7 +9570,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000030500
    }
   },
@@ -9627,7 +9627,7 @@
      },
      {
       "id": 2,
-      "hp": 42.63,
+      "hp": 39.1,
       "maxHp": 100,
       "meter": 1,
       "maxMeter": 100,
@@ -9652,7 +9652,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000030750
    }
   },
@@ -9709,7 +9709,7 @@
      },
      {
       "id": 2,
-      "hp": 43,
+      "hp": 39.4,
       "maxHp": 100,
       "meter": 2,
       "maxMeter": 100,
@@ -9734,7 +9734,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000031000
    }
   },
@@ -9791,7 +9791,7 @@
      },
      {
       "id": 2,
-      "hp": 43.38,
+      "hp": 39.7,
       "maxHp": 100,
       "meter": 3,
       "maxMeter": 100,
@@ -9816,7 +9816,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000031250
    }
   },
@@ -9873,7 +9873,7 @@
      },
      {
       "id": 2,
-      "hp": 43.75,
+      "hp": 40,
       "maxHp": 100,
       "meter": 4,
       "maxMeter": 100,
@@ -9898,7 +9898,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000031500
    }
   },
@@ -9955,7 +9955,7 @@
      },
      {
       "id": 2,
-      "hp": 44.13,
+      "hp": 40.3,
       "maxHp": 100,
       "meter": 4,
       "maxMeter": 100,
@@ -9980,7 +9980,7 @@
    "type": "heal_tick",
    "payload": {
     "player": 2,
-    "amount": 0.375,
+    "amount": 0.3,
     "t": 1700000031750
    }
   },
@@ -10037,7 +10037,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 5,
       "maxMeter": 100,
@@ -10110,7 +10110,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 6,
       "maxMeter": 100,
@@ -10183,7 +10183,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 6,
       "maxMeter": 100,
@@ -10256,7 +10256,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 7,
       "maxMeter": 100,
@@ -10329,7 +10329,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 8,
       "maxMeter": 100,
@@ -10365,7 +10365,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.8,
+    "magnitude": 0.58,
     "t": 1700000033000
    }
   },
@@ -10422,7 +10422,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 9,
       "maxMeter": 100,
@@ -10495,7 +10495,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 9,
       "maxMeter": 100,
@@ -10568,7 +10568,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 10,
       "maxMeter": 100,
@@ -10641,7 +10641,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 11,
       "maxMeter": 100,
@@ -10714,7 +10714,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 11,
       "maxMeter": 100,
@@ -10787,7 +10787,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 12,
       "maxMeter": 100,
@@ -10823,7 +10823,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.8,
+    "magnitude": 0.58,
     "t": 1700000034500
    }
   },
@@ -10880,7 +10880,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 13,
       "maxMeter": 100,
@@ -10953,7 +10953,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 14,
       "maxMeter": 100,
@@ -11026,7 +11026,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 14,
       "maxMeter": 100,
@@ -11099,7 +11099,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 15,
       "maxMeter": 100,
@@ -11172,7 +11172,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 16,
       "maxMeter": 100,
@@ -11245,7 +11245,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 16,
       "maxMeter": 100,
@@ -11318,7 +11318,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 17,
       "maxMeter": 100,
@@ -11391,7 +11391,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 18,
       "maxMeter": 100,
@@ -11464,7 +11464,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 19,
       "maxMeter": 100,
@@ -11537,7 +11537,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 19,
       "maxMeter": 100,
@@ -11573,7 +11573,7 @@
    "type": "flinch",
    "payload": {
     "player": 1,
-    "magnitude": 0.85,
+    "magnitude": 0.58,
     "t": 1700000037000
    }
   },
@@ -11648,7 +11648,7 @@
      },
      {
       "id": 2,
-      "hp": 44.5,
+      "hp": 40.6,
       "maxHp": 100,
       "meter": 20,
       "maxMeter": 100,

@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createMomentDetector, PRIORITY } from '../../src/commentary/moments.js';
+import { createMomentDetector, PRIORITY, DEFAULTS, thresholdsFrom } from '../../src/commentary/moments.js';
+import { mechanicsConfig } from '../../src/mechanics.config.js';
+
+// Magnitude the engine puts on the bus for a defender with this stress (B's formula / 2).
+const flinchMag = (stress, c = mechanicsConfig) => (c.flinch.min + (c.flinch.max - c.flinch.min) * stress) / 2;
 import { startCommentaryListener } from '../../src/commentary/listener.js';
 import { replayMatchSync } from '../../tools/replay-match.js';
 
@@ -36,10 +40,25 @@ test('round_end announced on time-out, suppressed after KO', () => {
   assert.deepEqual(d.handle('round_end', { round: 2, winner: 2, t: 2 }), []);
 });
 
-test('only big flinches become moments', () => {
+test('big flinch: stressed defenders only, using the real magnitude range', () => {
   const d = createMomentDetector();
-  assert.deepEqual(d.handle('flinch', { player: 2, magnitude: 0.3, t: 0 }), []);
-  assert.deepEqual(types(d.handle('flinch', { player: 2, magnitude: 0.7, t: 1 })), ['big_flinch']);
+  assert.deepEqual(d.handle('flinch', { player: 2, magnitude: flinchMag(0), t: 0 }), [], 'calm');
+  assert.deepEqual(d.handle('flinch', { player: 2, magnitude: flinchMag(0.3), t: 1 }), [], 'mock baseline stress');
+  assert.deepEqual(d.handle('flinch', { player: 2, magnitude: flinchMag(0.5), t: 2 }), [], 'middling');
+  assert.deepEqual(types(d.handle('flinch', { player: 2, magnitude: flinchMag(0.6), t: 3 })), ['big_flinch'], 'stressed hotkey, lowest point');
+  assert.deepEqual(types(d.handle('flinch', { player: 2, magnitude: flinchMag(1), t: 4 })), ['big_flinch'], 'max stress');
+});
+
+test('thresholds stay inside what B\'s formulas can produce (guards future retuning)', () => {
+  for (const config of [mechanicsConfig, { flinch: { min: 0.5, max: 2 }, heal: { base: 2, max: 3 } }]) {
+    const th = thresholdsFrom(config);
+    assert.ok(th.bigFlinchMagnitude > flinchMag(0.5, config), 'calm/middling players are not "big"');
+    assert.ok(th.bigFlinchMagnitude <= flinchMag(0.6, config), 'a stressed player (hotkey minimum) is');
+    const perWindow = (rate) => rate * th.healStreakWindowMs / 1000;
+    assert.ok(perWindow(config.heal.base) >= th.healStreakHp, 'base-rate healing for the window reaches a streak');
+    assert.ok(th.healStreakHp > 0);
+  }
+  assert.equal(DEFAULTS.bigFlinchMagnitude, thresholdsFrom().bigFlinchMagnitude);
 });
 
 test('combo after 3 hits in window; broken by gap or other attacker', () => {
@@ -54,20 +73,28 @@ test('combo after 3 hits in window; broken by gap or other attacker', () => {
   assert.deepEqual(hit(1, 9700), ['hit']);
 });
 
-test('heal streak: accumulates small ticks, reset by getting hit, has cooldown', () => {
+test('heal streak: ~5s of real healing (60 ticks/s at B\'s base rate), reset by a hit, cooldown', () => {
   const d = createMomentDetector();
-  const tick = (t) => d.handle('heal_tick', { player: 1, amount: 0.5, t });
-  let out = [];
-  for (let t = 0; t < 3000; t += 250) out.push(...tick(t)); // 12 ticks = 6 HP
-  assert.deepEqual(out, []);
+  const rate = mechanicsConfig.heal.base; // slowest real healing, 1 HP/s
+  const heal = (from, to) => {
+    const out = [];
+    for (let t = from; t < to; t += 1000 / 60) out.push(...d.handle('heal_tick', { player: 1, amount: rate / 60, t: Math.round(t) }));
+    return out;
+  };
+  assert.deepEqual(heal(0, 3000), [], '3s is not a streak yet');
   d.handle('hit', { attacker: 2, defender: 1, damage: 5, kind: 'light', t: 3000 });
-  for (let t = 3250; t < 6250; t += 250) out.push(...tick(t)); // 6 HP again, reset
-  assert.deepEqual(out, [], 'hit wiped the streak');
-  for (let t = 6250; t < 7500; t += 250) out.push(...tick(t)); // +2.5 -> 8.5
-  assert.deepEqual(types(out), ['heal_streak']);
-  out = [];
-  for (let t = 7500; t < 12000; t += 250) out.push(...tick(t));
-  assert.deepEqual(out, [], 'cooldown');
+  assert.deepEqual(heal(4400, 7400), [], 'hit wiped the streak; 3s again');
+  const out = heal(7400, 9400);
+  assert.deepEqual(types(out), ['heal_streak'], 'fires by 5s of uninterrupted healing');
+  assert.ok(out[0].t - 4400 <= 5000);
+  assert.deepEqual(heal(9400, 18000), [], 'cooldown');
+});
+
+test('heal streak never fires for a player who is not healing', () => {
+  const d = createMomentDetector();
+  const out = [];
+  for (let t = 0; t < 20000; t += 1000 / 60) out.push(...d.handle('heal_tick', { player: 1, amount: 0, t: Math.round(t) }));
+  assert.deepEqual(out, []);
 });
 
 test('comeback when a player erases a big deficit', () => {
