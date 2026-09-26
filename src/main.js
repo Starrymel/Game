@@ -18,12 +18,20 @@ const ctx = canvas.getContext('2d');
 //   http://<host-ip>:<port>/?role=guest&player=2  (on the second laptop)
 // Needs netplay/server.js running on the host (see netplay/README.md).
 // Omit ?role entirely for normal single-laptop, one-keyboard, two-player play.
+//
+// If the guest also wants its own camera for real Presage data, getUserMedia
+// requires a secure context (HTTPS or localhost) -- a plain http://<host-ip>
+// page loaded on a *different* machine doesn't qualify. In that case the
+// guest instead runs its own local copy of this same repo served on its own
+// localhost, and must pass &host=<host-ip> explicitly since location.hostname
+// would otherwise (wrongly) resolve to its own machine, not the host's.
 const params = new URLSearchParams(location.search);
 const role = params.get('role'); // 'host' | 'guest' | null
 const player = Number(params.get('player')) || (role === 'guest' ? 2 : 1);
 
 if (role === 'host' || role === 'guest') {
-  const relayUrl = `ws://${location.hostname}:${params.get('relayPort') || 8788}/netplay`;
+  const netHost = params.get('host') || location.hostname;
+  const relayUrl = `ws://${netHost}:${params.get('relayPort') || 8788}/netplay`;
   connectNet({ relayUrl, asRole: role, myPlayer: player });
 }
 

@@ -73,6 +73,12 @@ function getOrCreateSession(player, broadcast) {
       }
       if (hr == null && breath == null) return;
 
+      const now = Date.now();
+      if (now - (session.lastLoggedAt || 0) >= 2000) {
+        session.lastLoggedAt = now;
+        console.log(`[presage-bridge] player ${player}: hr=${hr?.toFixed(1)} breath=${breath?.toFixed(1)}`);
+      }
+
       if (hr != null) {
         session.restingHr = session.restingHr == null ? hr : session.restingHr * 0.98 + hr * 0.02;
       }
