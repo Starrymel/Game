@@ -48,11 +48,12 @@ const bridgeWsUrl = bridgeUrlFor(location, params);
 // ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
 const res = Number(params.get('presageRes'));
 initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
-if (params.get('blinklab')) initBlinkLab({ player });
+if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
 
 const match = runLoop({
   onRender: (match) => render(ctx, match),
 });
+window.__match = match; // debug/tests
 if (match) initDebugPanel(match); // Only the host owns mutable game state.
 
 // Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).

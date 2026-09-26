@@ -13,7 +13,7 @@ export function summarizeBlinks(blinks) {
   };
 }
 
-export function initBlinkLab({ player }) {
+export function initBlinkLab({ player, fire = true }) {
   const panel = document.createElement('details');
   panel.id = 'blink-lab';
   panel.open = true;
@@ -24,17 +24,23 @@ export function initBlinkLab({ player }) {
     <p id="bl-delay">Delay: -</p>
     <p id="bl-face">Talking: - | Expression: -</p>
     <p id="bl-age"></p>
-    <label><input type="checkbox" id="bl-fire"> Blink = light attack</label><br>
+    <label><input type="checkbox" id="bl-fire"> Blink = light attack</label> <span id="bl-punch"></span><br>
     <button type="button" id="bl-sim">Simulate blink</button>
     <button type="button" id="bl-reset">Reset counts</button>
   `;
   document.body.append(panel);
   const $ = (id) => panel.querySelector(id);
+  $('#bl-fire').checked = fire; // on by default: every blink = a punch (?blinkfire=0 to turn off)
   let blinks = [];
   let lastMsgAt = 0;
   let firstBlinkAt = 0;
 
-  function fire() { if ($('#bl-fire').checked) pulseInput(player, 'light', 150); }
+  function fire() {
+    if (!$('#bl-fire').checked) return;
+    pulseInput(player, 'light', 150);
+    const el = $('#bl-punch'); el.textContent = 'PUNCH!';
+    setTimeout(() => { el.textContent = ''; }, 400);
+  }
 
   bus.on('face_sample', (m) => {
     if (m.player !== player) return;
