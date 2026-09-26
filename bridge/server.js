@@ -37,7 +37,17 @@ function baevskyToStress(baevsky) {
   return clamp(Math.log10(Math.max(baevsky, 1) / 100) / 1.5 + 0.3, 0, 1);
 }
 
-const sessions = new Map(); // player -> { sdk, restingHr }
+const sessions = new Map(); // player -> { sdk, restingHr, frameCount }
+
+function destroySession(player) {
+  const session = sessions.get(player);
+  if (!session) return;
+  try {
+    session.sdk?.destroy();
+  } catch (_) { /* already gone, nothing to clean up */ }
+  sessions.delete(player);
+  console.log(`[presage-bridge] player ${player}: session destroyed`);
+}
 
 function getOrCreateSession(player, broadcast) {
   let session = sessions.get(player);
@@ -45,7 +55,7 @@ function getOrCreateSession(player, broadcast) {
 
   // Cache the session object before any SDK call so a failed start() below
   // doesn't retry (and re-throw) on every subsequent frame for this player.
-  session = { sdk: null, restingHr: null, failed: false };
+  session = { sdk: null, restingHr: null, failed: false, frameCount: 0 };
   sessions.set(player, session);
 
   try {
@@ -72,6 +82,12 @@ function getOrCreateSession(player, broadcast) {
         console.log(`[presage-bridge] player ${player}: first real breathing reading (${breath.toFixed(1)}/min)`);
       }
       if (hr == null && breath == null) return;
+
+      const now = Date.now();
+      if (now - (session.lastLoggedAt || 0) >= 2000) {
+        session.lastLoggedAt = now;
+        console.log(`[presage-bridge] player ${player}: hr=${hr?.toFixed(1)} breath=${breath?.toFixed(1)}`);
+      }
 
       if (hr != null) {
         session.restingHr = session.restingHr == null ? hr : session.restingHr * 0.98 + hr * 0.02;
@@ -101,18 +117,23 @@ function getOrCreateSession(player, broadcast) {
 
     sdk.on('error', (code, message, retryable) => {
       console.error(`[presage-bridge] player ${player} SDK error:`, code, message, 'retryable=', retryable);
-      // Empirically, an 'error' event here can leave the session in a state
-      // where the NEXT sendFrame() throws synchronously instead of degrading
-      // gracefully (crashed the whole process once already). reset() is the
-      // SDK's documented way to rebuild the pipeline after an error -- if
-      // even that throws, give up on this session rather than let a future
-      // frame take down the process.
-      try {
-        sdk.reset();
-      } catch (resetErr) {
-        session.failed = true;
-        console.error(`[presage-bridge] player ${player} reset() also failed, giving up on this session:`, resetErr.message);
+      if (retryable) {
+        // reset() is the SDK's documented way to rebuild the pipeline after
+        // a recoverable error -- if even that throws, fall through and
+        // destroy the session below rather than leave it half-broken.
+        try {
+          sdk.reset();
+          return;
+        } catch (resetErr) {
+          console.error(`[presage-bridge] player ${player} reset() also failed:`, resetErr.message);
+        }
       }
+      // Non-retryable (e.g. kTimestampGap after any real-world pause --
+      // reload, or us restarting things between tests) or reset failed:
+      // the SDK is telling us this session is unsalvageable. Destroy it so
+      // the next frame starts a completely fresh session instead of feeding
+      // more frames into a session that will just keep erroring.
+      destroySession(player);
     });
 
     session.sdk = sdk;
@@ -134,10 +155,9 @@ function broadcast(payload) {
   });
 }
 
-const frameCounts = {};
-
 wss.on('connection', (ws) => {
   console.log('[presage-bridge] browser connected');
+  const seenPlayers = new Set(); // which players this specific connection has sent frames for
 
   ws.on('message', (data, isBinary) => {
     if (!isBinary || data.length <= HEADER_BYTES) return;
@@ -148,10 +168,11 @@ wss.on('connection', (ws) => {
     const timestampUs = data.readDoubleLE(12);
     const pixels = data.subarray(HEADER_BYTES);
 
+    seenPlayers.add(player);
     const session = getOrCreateSession(player, broadcast);
     if (session.failed || !session.sdk) return; // session unusable, drop the frame
 
-    const n = (frameCounts[player] = (frameCounts[player] || 0) + 1);
+    const n = ++session.frameCount;
     let accepted = false;
     try {
       accepted = session.sdk.sendFrame(pixels, width, height, width * 4, PixelFormat.kRGBA, timestampUs);
@@ -170,7 +191,13 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => console.log('[presage-bridge] browser disconnected'));
+  ws.on('close', () => {
+    console.log('[presage-bridge] browser disconnected');
+    // A reload/close means "start fresh" for whatever players this
+    // connection was streaming -- a stale session fed frames after a
+    // real-world gap is exactly what triggers kTimestampGap.
+    for (const player of seenPlayers) destroySession(player);
+  });
 });
 
 process.on('SIGINT', () => {

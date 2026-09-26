@@ -1,0 +1,19 @@
+# Owner: D. Two-laptop relay (Daphne's netplay/server.js). Only reachable through Caddy at /netplay.
+[Unit]
+Description=Composure two-laptop relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=composure
+WorkingDirectory=/opt/composure/netplay
+Environment=NODE_ENV=production
+Environment=NETPLAY_PORT=8788
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

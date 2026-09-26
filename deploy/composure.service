@@ -1,2 +1,21 @@
-# Owner: D
-# systemd unit
+# Owner: D. Main app: game files, API, logging, dashboard. Installed by setup.sh, restarted by deploy.sh.
+[Unit]
+Description=Composure game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=composure
+WorkingDirectory=/opt/composure
+EnvironmentFile=/opt/composure/.env
+Environment=NODE_ENV=production
+# Batches are spooled here when the database is unreachable, then replayed automatically.
+Environment=SPOOL_DIR=/var/lib/composure/spool
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

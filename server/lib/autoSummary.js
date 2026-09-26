@@ -1,50 +1,54 @@
 // Owner: C
-// Writes the Gemini post-match summary into matches.summary as soon as a match's final
-// batch is stored, so every match in the dashboard has one without anyone opening it.
+// Writes the Gemini post-match summary as soon as a match ends, so every match in the
+// dashboard has one without anyone opening it.
 //   - one summary at a time (no bursts when spooled matches replay)
+//   - at most once per match per server run (match end is signalled from memory and
+//     again after the DB write)
 //   - never overwrites a summary that's already there (e.g. saved by the recap)
 //   - only stores real Gemini output; if Gemini is down, nothing is stored and the
 //     dashboard/recap can still generate one on demand later
+// Saves to the DB when reachable and to the in-memory copy either way.
 // Disable with AUTO_SUMMARY=0.
 
-const { loadMatchDetail } = require('./matchStore');
 const gemini = require('../ai/gemini');
 
-function createAutoSummary({ pool, generateSummary = gemini.generateSummary, load = loadMatchDetail, log = console } = {}) {
+function createAutoSummary({ store, generateSummary = gemini.generateSummary, log = console } = {}) {
   let chain = Promise.resolve();
-  const pending = new Set();
+  const seen = new Set();
 
   async function run(id) {
-    const d = await load(pool, id);
-    if (!d) return 'missing';
-    if (d.match.summary) return 'exists';
-    if (!d.snapshots.length && !d.events.length) return 'empty';
-    const s = await generateSummary(d);
+    // The memory copy is complete the moment the final batch arrives; the DB may lag.
+    const detail = store.memory?.has(id) ? store.memory.detail(id) : (await store.detail(id)).detail;
+    if (!detail) return 'missing';
+    if (detail.match.summary) return 'exists';
+    if (!detail.snapshots.length && !detail.events.length) return 'empty';
+    const s = await generateSummary(detail);
     if (s.source !== 'gemini') return 'no-gemini';
-    const r = await pool.query('UPDATE matches SET summary=$2 WHERE id=$1 AND summary IS NULL', [id, gemini.summaryText(s)]);
-    return r.rowCount ? 'saved' : 'exists';
+    return (await store.saveSummary(id, gemini.summaryText(s), { onlyIfEmpty: true })) ? 'saved' : 'exists';
   }
 
   function summarize(id) {
-    if (pending.has(id)) return chain;
-    pending.add(id);
+    if (seen.has(id)) return chain;
+    seen.add(id);
     chain = chain
       .then(() => run(id))
       .then(
-        (result) => { if (result === 'saved') log.log(`[ai] auto-summary saved for ${id}`); return result; },
-        (err) => { log.warn(`[ai] auto-summary failed for ${id}: ${err.message}`); return 'error'; },
-      )
-      .finally(() => pending.delete(id));
+        (result) => {
+          if (result === 'saved') log.log(`[ai] auto-summary saved for ${id}`);
+          if (result === 'no-gemini' || result === 'missing') seen.delete(id); // allow a later retry
+          return result;
+        },
+        (err) => { seen.delete(id); log.warn(`[ai] auto-summary failed for ${id}: ${err.message}`); return 'error'; },
+      );
     return chain;
   }
 
   return { summarize };
 }
 
-// Hooks the worker onto ingest's match-end signal. No-op without a DB.
-function attach(ingest, { pool = require('./db').pool, env = process.env } = {}) {
-  if (!pool || env.AUTO_SUMMARY === '0') return null;
-  const worker = createAutoSummary({ pool });
+function attach(ingest, { store = require('./matchStore').getMatchStore(), env = process.env } = {}) {
+  if (env.AUTO_SUMMARY === '0') return null;
+  const worker = createAutoSummary({ store });
   ingest.onMatchEnd((id) => worker.summarize(id));
   return worker;
 }

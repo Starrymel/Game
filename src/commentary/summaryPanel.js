@@ -9,7 +9,8 @@ export function createSummaryPanel({ doc = globalThis.document } = {}) {
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', 'polite');
   Object.assign(el.style, {
-    position: 'fixed', top: '64px', left: '50%', transform: 'translateX(-50%)',
+    // Bottom-centre, just above the logger's "View round recap" button, clear of the HP HUD.
+    position: 'fixed', bottom: '84px', left: '50%', transform: 'translateX(-50%)',
     width: 'min(560px, calc(100vw - 32px))', boxSizing: 'border-box', zIndex: '40',
     padding: '16px 20px', borderRadius: '10px', background: 'rgba(12, 14, 20, 0.92)',
     boxShadow: '0 0 0 1px #2c3140, 0 8px 28px rgba(0,0,0,0.5)', color: '#e8eaf0',

@@ -1,2 +1,15 @@
-# Owner: D
-# HTTPS reverse proxy
+# Owner: D. HTTPS reverse proxy. setup.sh replaces {{DOMAIN}} and installs this as /etc/caddy/Caddyfile.
+# Caddy gets and renews the TLS certificate by itself. HTTPS is what lets the browser use the camera.
+{{DOMAIN}} {
+	encode gzip
+
+	# Two-laptop play: the browser connects to wss://<domain>/netplay, Caddy forwards it to the local relay.
+	handle /netplay* {
+		reverse_proxy 127.0.0.1:8788
+	}
+
+	# Everything else: the game, the dashboard and the API.
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
