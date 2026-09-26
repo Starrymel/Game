@@ -27,10 +27,13 @@ export async function listCameraDevices() {
 }
 
 export async function startPresageCapture(player, {
-  deviceId, wsUrl = 'ws://localhost:8787/biometrics', fps = 8, width = 320, height = 240,
+  deviceId, wsUrl = 'ws://localhost:8787/biometrics', fps = 30, width = 320, height = 240,
 } = {}) {
+  // frameRate is a request, not a guarantee -- but without it many cameras
+  // default well below the >=25fps SmartSpectra requires (see bridge logs:
+  // ValidationCode.kFrameRateTooLow if this isn't actually met).
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: deviceId ? { deviceId: { exact: deviceId } } : true,
+    video: { frameRate: { ideal: fps, min: 25 }, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) },
   });
 
   const video = document.createElement('video');
@@ -46,26 +49,47 @@ export async function startPresageCapture(player, {
   const socket = new WebSocket(wsUrl);
   socket.binaryType = 'arraybuffer';
 
+  function sendFrame() {
+    ctx.drawImage(video, 0, 0, width, height);
+    const { data } = ctx.getImageData(0, 0, width, height); // RGBA Uint8ClampedArray
+
+    const buf = new ArrayBuffer(HEADER_BYTES + data.length);
+    const view = new DataView(buf);
+    view.setUint32(0, player, true);
+    view.setUint32(4, width, true);
+    view.setUint32(8, height, true);
+    view.setFloat64(12, (performance.timeOrigin + performance.now()) * 1000, true); // ms -> us
+    new Uint8Array(buf, HEADER_BYTES).set(data);
+
+    if (socket.readyState === WebSocket.OPEN) socket.send(buf);
+  }
+
+  // requestVideoFrameCallback fires once per actually-decoded video frame --
+  // unlike setInterval, it can't drift under main-thread jank and can't send
+  // the same stale frame twice (which would waste SmartSpectra's >=25fps
+  // requirement on zero new signal). Falls back to setInterval on browsers
+  // without it (Safari has supported it since 15.4).
+  let stopped = false;
+  let rvfcHandle = null;
   let timer = null;
+
   socket.onopen = () => {
-    timer = setInterval(() => {
-      ctx.drawImage(video, 0, 0, width, height);
-      const { data } = ctx.getImageData(0, 0, width, height); // RGBA Uint8ClampedArray
-
-      const buf = new ArrayBuffer(HEADER_BYTES + data.length);
-      const view = new DataView(buf);
-      view.setUint32(0, player, true);
-      view.setUint32(4, width, true);
-      view.setUint32(8, height, true);
-      view.setFloat64(12, performance.timeOrigin + performance.now(), true);
-      new Uint8Array(buf, HEADER_BYTES).set(data);
-
-      if (socket.readyState === WebSocket.OPEN) socket.send(buf);
-    }, 1000 / fps);
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      const onFrame = () => {
+        if (stopped) return;
+        sendFrame();
+        rvfcHandle = video.requestVideoFrameCallback(onFrame);
+      };
+      rvfcHandle = video.requestVideoFrameCallback(onFrame);
+    } else {
+      timer = setInterval(sendFrame, 1000 / fps);
+    }
   };
   socket.onerror = (e) => console.warn(`[presage-capture] player ${player} socket error`, e);
 
   return function stopPresageCapture() {
+    stopped = true;
+    if (rvfcHandle) video.cancelVideoFrameCallback(rvfcHandle);
     clearInterval(timer);
     socket.close();
     stream.getTracks().forEach((t) => t.stop());

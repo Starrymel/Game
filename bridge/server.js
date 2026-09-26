@@ -63,6 +63,14 @@ function getOrCreateSession(player, broadcast) {
       const hr = metrics.cardio?.pulseRate?.at(-1)?.value;
       const breath = metrics.breathing?.rate?.at(-1)?.value;
       const baevsky = metrics.cardio?.hrv?.at(-1)?.baevsky;
+      if (hr != null && !session.gotFirstHr) {
+        session.gotFirstHr = true;
+        console.log(`[presage-bridge] player ${player}: first real HR reading (${hr.toFixed(1)} bpm)`);
+      }
+      if (breath != null && !session.gotFirstBreath) {
+        session.gotFirstBreath = true;
+        console.log(`[presage-bridge] player ${player}: first real breathing reading (${breath.toFixed(1)}/min)`);
+      }
       if (hr == null && breath == null) return;
 
       if (hr != null) {
@@ -84,8 +92,27 @@ function getOrCreateSession(player, broadcast) {
       });
     });
 
+    sdk.on('validationStatus', (code, ts, hint) => {
+      if (code !== session.lastValidationCode) {
+        session.lastValidationCode = code;
+        console.log(`[presage-bridge] player ${player}: validation changed -> code=${code} hint=${hint}`);
+      }
+    });
+
     sdk.on('error', (code, message, retryable) => {
       console.error(`[presage-bridge] player ${player} SDK error:`, code, message, 'retryable=', retryable);
+      // Empirically, an 'error' event here can leave the session in a state
+      // where the NEXT sendFrame() throws synchronously instead of degrading
+      // gracefully (crashed the whole process once already). reset() is the
+      // SDK's documented way to rebuild the pipeline after an error -- if
+      // even that throws, give up on this session rather than let a future
+      // frame take down the process.
+      try {
+        sdk.reset();
+      } catch (resetErr) {
+        session.failed = true;
+        console.error(`[presage-bridge] player ${player} reset() also failed, giving up on this session:`, resetErr.message);
+      }
     });
 
     session.sdk = sdk;
@@ -107,7 +134,11 @@ function broadcast(payload) {
   });
 }
 
+const frameCounts = {};
+
 wss.on('connection', (ws) => {
+  console.log('[presage-bridge] browser connected');
+
   ws.on('message', (data, isBinary) => {
     if (!isBinary || data.length <= HEADER_BYTES) return;
 
@@ -119,11 +150,40 @@ wss.on('connection', (ws) => {
 
     const session = getOrCreateSession(player, broadcast);
     if (session.failed || !session.sdk) return; // session unusable, drop the frame
-    session.sdk.sendFrame(pixels, width, height, width * 4, PixelFormat.kRGBA, timestampUs);
+
+    const n = (frameCounts[player] = (frameCounts[player] || 0) + 1);
+    let accepted = false;
+    try {
+      accepted = session.sdk.sendFrame(pixels, width, height, width * 4, PixelFormat.kRGBA, timestampUs);
+    } catch (err) {
+      // sendFrame() can throw synchronously (e.g. "not in a valid state"
+      // after an internal error) instead of just emitting 'error' -- without
+      // this catch, one bad frame kills the whole bridge process.
+      session.failed = true;
+      console.error(`[presage-bridge] player ${player} sendFrame() threw, dropping this session:`, err.message);
+      return;
+    }
+    if (n === 1) {
+      console.log(`[presage-bridge] player ${player}: first frame received (${width}x${height}), sendFrame accepted=${accepted}`);
+    } else if (n % 40 === 0) {
+      console.log(`[presage-bridge] player ${player}: ${n} frames received so far, sendFrame accepted=${accepted}`);
+    }
   });
+
+  ws.on('close', () => console.log('[presage-bridge] browser disconnected'));
 });
 
 process.on('SIGINT', () => {
   for (const { sdk } of sessions.values()) sdk.destroy();
   process.exit(0);
+});
+
+// Defense in depth: we've now hit two different native SDK call sites
+// (start(), sendFrame()) that throw synchronously instead of emitting a
+// recoverable event, despite the docs implying the latter. Both are wrapped
+// above, but if a future native call throws somewhere we haven't guarded,
+// keep the whole bridge alive (log and continue) rather than let one bad
+// frame from one player kill biometrics for both mid-demo.
+process.on('uncaughtException', (err) => {
+  console.error('[presage-bridge] uncaught exception, bridge staying alive:', err.message);
 });

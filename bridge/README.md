@@ -37,15 +37,38 @@ calls with different canvas crop regions (not implemented here; extend
 `presage-capture.js`'s `drawImage` call with source-rect args if that's the
 setup on demo day).
 
-## Known limitations (read before demo)
+## Confirmed working (tested end to end, not just against docs)
 
-- **Not tested against a real API key or camera in this environment** — the
-  SDK package, its exports, and the frame/event API were verified directly
-  against the installed package and official docs, but the full pipeline
-  (real webcam → real SmartSpectra inference → real metrics) has not been
-  run end to end. Budget time to test this for real before relying on it.
-- HR updates roughly every few seconds (a few seconds of trailing video are
-  needed per reading); breathing confidence needs ~30s, HRV ~60s. The
+Real webcam -> real SmartSpectra inference -> real HR has been verified live:
+decoded HR values changing over time, `validationStatus` reporting `kOk`
+almost the entire session. Getting here required fixing several real bugs
+that only showed up under real use, all fixed in `server.js` /
+`src/presage-capture.js`:
+
+- **Camera must actually deliver >=25fps.** SmartSpectra's own
+  `validationStatus` event reports `kFrameRateTooLow` otherwise (its hint
+  literally says so) — 8fps (the original default) was nowhere near enough
+  for rPPG pulse extraction. Now requests 30fps from `getUserMedia` and
+  captures via `requestVideoFrameCallback` (tied to actual decoded frames,
+  won't drift or resend a stale frame under main-thread load) instead of a
+  `setInterval` poll.
+- **Frame timestamps must be microseconds, not milliseconds** — `sendFrame`'s
+  last argument is named `timestampUs` for a reason. Getting this wrong
+  doesn't error, it just silently starves the SDK's internal windowing.
+- **`sendFrame()` can throw synchronously**, not just emit a recoverable
+  `'error'` event like the docs implied — an internal processing error can
+  leave a session in a state where the next frame crashes the whole process.
+  Now wrapped in try/catch, with `sdk.reset()` attempted on `'error'` and a
+  process-level `uncaughtException` handler as a last line of defense.
+- Listen to `sdk.on('validationStatus', ...)` if something's not working —
+  its codes (`kNoFaceFound`, `kFrameRateTooLow`, `kTooDark`, etc.) are far
+  more diagnostic than the generic `kProcessingFailed` error alone.
+
+## Known limitations
+
+- HR updates roughly every ~10-15s in practice; breathing confidence needs a
+  ~30s continuous good window, HRV ~60s (untested how long breathing/HRV
+  actually take to appear — HR was confirmed, those two were not). The
   in-game smoothing layer (`src/biometrics.js`) turns these sparse updates
   into continuous per-frame values, but the underlying signal itself is
   still slow — don't expect per-hit reactivity from real biometrics.
@@ -54,3 +77,4 @@ setup on demo day).
   deviation heuristic otherwise (see `baevskyToStress()` / `restingHr` in
   `server.js`). Both are rough and meant to be retuned once you see real
   numbers — flag this to B.
+- Two-camera setup (one per player) is still untested in practice.
