@@ -14,6 +14,21 @@ let wanted = false;            // true while we should be connected to the bridg
 let retryTimer = null;
 let currentUrl = 'ws://localhost:8787/biometrics';
 let retryMs = 1500;
+let connected = false;
+const lastSampleAt = { 1: 0, 2: 0 };
+const lastHint = { 1: null, 2: null };
+
+// For the camera panel: is the bridge reachable, when did each player's last real
+// reading arrive, and what the SDK last said about the video ("No face found", ...).
+export function getPresageStatus() {
+  return { connected, url: currentUrl, lastSampleAt: { ...lastSampleAt }, lastHint: { ...lastHint } };
+}
+
+function setConnected(next) {
+  if (next === connected) return;
+  connected = next;
+  bus.emit('presage_connection', { connected, url: currentUrl });
+}
 
 export function getPresageBiometrics(id) {
   const s = state[id];
@@ -37,13 +52,23 @@ function connect() {
     return;
   }
   const mine = socket;
-  mine.onopen = () => console.info('[presage] connected to the bridge');
+  mine.onopen = () => { console.info('[presage] connected to the bridge'); setConnected(true); };
   mine.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data); // expect { player, hr, breath, stress, calm }
-    const s = state[msg.player];
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+    const s = state[msg?.player];
     if (!s) return;
-    Object.assign(s, msg, { t: Date.now() });
-    bus.emit('biometric_sample', { ...s, player: msg.player, source: 'presage' });
+    // Bridge status updates (SDK validation hints, session errors) aren't readings.
+    if (msg.type === 'status') {
+      lastHint[msg.player] = msg.hint ?? null;
+      bus.emit('presage_status', { player: msg.player, code: msg.code, hint: msg.hint, error: msg.error });
+      return;
+    }
+    if (!Number.isFinite(msg.hr) && !Number.isFinite(msg.breath)) return;
+    const { player, hr, breath, stress, calm } = msg; // expect { player, hr, breath, stress, calm }
+    Object.assign(s, { hr, breath, stress, calm }, { t: Date.now() });
+    lastSampleAt[player] = s.t;
+    bus.emit('biometric_sample', { ...s, player, source: 'presage' });
   };
   // The bridge may not be running yet, or may be restarted mid-session: keep trying instead of giving up
   // (before, one failed attempt left the game on mock data even though the camera was streaming fine).
@@ -51,14 +76,22 @@ function connect() {
   // so retry from both; scheduleRetry() is safe to call twice.
   mine.onerror = () => {
     console.warn('[presage] bridge not reachable, will keep retrying');
-    if (socket === mine) socket = null;            // forget it: don't rely on the socket's readyState after an error
+    if (socket === mine) { socket = null; setConnected(false); } // forget it: don't rely on readyState after an error
     try { mine.close(); } catch (_) { /* already closed */ }
     scheduleRetry();
   };
-  mine.onclose = () => { if (socket === mine) socket = null; scheduleRetry(); };
+  mine.onclose = () => { if (socket === mine) { socket = null; setConnected(false); } scheduleRetry(); };
 }
 
-export function startPresageBiometrics(wsUrl = 'ws://localhost:8787/biometrics', { retryAfterMs = 1500 } = {}) {
+export function startPresageBiometrics(wsUrl = currentUrl, { retryAfterMs = 1500 } = {}) {
+  // Readings must come from the same bridge the camera frames go to; if a different
+  // bridge is requested (e.g. wss:// on the https site), drop the old connection.
+  if (wsUrl !== currentUrl && socket) {
+    const old = socket;
+    socket = null;
+    setConnected(false);
+    try { old.close(); } catch (_) { /* already closed */ }
+  }
   currentUrl = wsUrl;
   retryMs = retryAfterMs;
   wanted = true;
@@ -70,4 +103,5 @@ export function stopPresageBiometrics() {
   clearTimeout(retryTimer);
   socket?.close();
   socket = null;
+  setConnected(false);
 }

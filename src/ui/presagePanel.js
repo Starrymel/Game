@@ -2,6 +2,36 @@
 // renders when there's a real local match object -- the guest has none).
 // Replaces typing __listCameraDevices()/__startPresageCapture() by hand.
 import { listCameraDevices, startPresageCapture } from '../presage-capture.js';
+import { setBiometricsSource, getBiometricsSource } from '../biometrics.js';
+import { getPresageStatus } from '../biometrics-presage.js';
+import { bus } from '../eventBus.js';
+
+const STALE_MS = 6000; // no reading for this long while streaming -> say so
+
+// getUserMedia errors often have an empty message; say what actually went wrong.
+export function cameraErrorText(e) {
+  switch (e?.name) {
+    case 'OverconstrainedError': return 'this camera can\'t deliver 25+ fps, which Presage needs for heart rate. Try another camera or close apps using it.';
+    case 'NotAllowedError': return 'camera permission was denied. Allow the camera for this site in the browser settings, then try again.';
+    case 'NotFoundError': return 'no camera found.';
+    case 'NotReadableError': return 'the camera is busy (another app or tab is using it).';
+    default: return e?.message || e?.name || 'unknown error';
+  }
+}
+
+// One line per player: what's actually happening, so "heart rate does nothing"
+// has a visible reason (bridge not running, no face, waiting for first reading).
+export function describePresage(player, { source, streaming, status, hr, now = Date.now() }) {
+  if (source !== 'presage') return `Player ${player}: mock data (no camera)`;
+  if (!status.connected) return `Player ${player}: can't reach the Presage bridge at ${status.url} -- is it running? (cd bridge && npm start)`;
+  if (!streaming) return `Player ${player}: bridge connected, camera not started`;
+  const last = status.lastSampleAt[player];
+  const hint = status.lastHint[player];
+  if (!last) return `Player ${player}: waiting for first reading${hint ? ` -- ${hint}` : ' (keep your face in view and hold still ~10s)'}`;
+  const age = Math.round((now - last) / 1000);
+  if (now - last > STALE_MS) return `Player ${player}: no reading for ${age}s${hint ? ` -- ${hint}` : ''}`;
+  return `Player ${player}: ${Math.round(hr)} bpm from camera (updated ${age}s ago)`;
+}
 
 export function initPresagePanel({ wsUrl }) {
   const panel = document.createElement('details');
@@ -9,6 +39,8 @@ export function initPresagePanel({ wsUrl }) {
   panel.innerHTML = `
     <summary>Presage camera setup</summary>
     <p id="presage-status">Only one camera on this machine? Just click Start below -- no need to list devices first.</p>
+    <p id="presage-live-1"></p>
+    <p id="presage-live-2"></p>
     <button type="button" id="presage-list">List cameras (only needed if you have more than one)</button>
     <select id="presage-device"><option value="">Default camera</option></select>
     <br>
@@ -42,15 +74,36 @@ export function initPresagePanel({ wsUrl }) {
     }
   };
 
+  const streaming = { 1: false, 2: false };
+  const lastHr = { 1: null, 2: null };
+  bus.on('biometric_sample', (s) => { if (s.source === 'presage') lastHr[s.player] = s.hr; });
+
+  function renderLive() {
+    const st = getPresageStatus();
+    for (const p of [1, 2]) {
+      panel.querySelector(`#presage-live-${p}`).textContent =
+        describePresage(p, { source: getBiometricsSource(p), streaming: streaming[p], status: st, hr: lastHr[p] });
+    }
+  }
+  renderLive();
+  setInterval(renderLive, 1000);
+  bus.on('presage_connection', renderLive);
+  bus.on('presage_status', renderLive);
+
   async function start(player) {
     status.textContent = `Requesting camera for player ${player}…`;
     try {
-      window.__setBiometricsSource?.('presage');
+      // Only this player switches to the camera; readings come from the same
+      // bridge the frames go to.
+      setBiometricsSource('presage', { player, wsUrl });
       await startPresageCapture(player, { deviceId: select.value || undefined, wsUrl });
+      streaming[player] = true;
       status.textContent = `Streaming this camera for player ${player} to ${wsUrl}.`;
     } catch (e) {
-      status.textContent = `Failed to start camera for player ${player}: ${e.message}`;
+      setBiometricsSource('mock', { player }); // no camera: don't leave this player frozen
+      status.textContent = `Failed to start camera for player ${player}: ${cameraErrorText(e)}`;
     }
+    renderLive();
   }
 
   panel.querySelector('#presage-start-1').onclick = () => start(1);
