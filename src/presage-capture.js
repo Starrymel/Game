@@ -77,7 +77,15 @@ export async function startPresageCapture(player, {
     if (typeof video.requestVideoFrameCallback === 'function') {
       const onFrame = () => {
         if (stopped) return;
-        sendFrame();
+        // If sendFrame() throws, still reschedule the next frame -- otherwise
+        // one bad frame silently kills the whole capture loop forever, with
+        // the camera light staying on and no visible error (looks exactly
+        // like "the HR just stopped updating" from the game side).
+        try {
+          sendFrame();
+        } catch (e) {
+          console.warn(`[presage-capture] player ${player} sendFrame() threw, continuing`, e);
+        }
         rvfcHandle = video.requestVideoFrameCallback(onFrame);
       };
       rvfcHandle = video.requestVideoFrameCallback(onFrame);
