@@ -1,6 +1,6 @@
 import { bus } from './eventBus.js';
 import { Mechanics } from './mechanics.js';
-import { getBiometrics } from './biometrics.js';
+import { getBiometrics, advanceBiometricsSmoothing } from './biometrics.js';
 import { readInput } from './input.js';
 import {
   STAGE, PHYSICS, COMBAT, makeFighter, hurtbox, hitbox, overlaps,
@@ -36,11 +36,6 @@ export function resetMatch(match) {
   match.fighters[2] = makeFighter(2, STAGE.width * 0.7, -1);
   bus.emit('round_start', { round: match.round, t: Date.now() });
 }
-
-const latestBiometrics = { 1: null, 2: null };
-bus.on('biometric_sample', ({ player, ...s }) => {
-  latestBiometrics[player] = { player, ...s };
-});
 
 function startAttack(f, kind) {
   f.attack = {
@@ -101,7 +96,7 @@ function resolveHit(match, attacker, defender, kind, t) {
 }
 
 function updateFighter(match, f, opponent, dtSeconds, t) {
-  f.biometrics = latestBiometrics[f.id] ?? getBiometrics(f.id) ?? f.biometrics;
+  f.biometrics = getBiometrics(f.id);
 
   if (f.state === 'ko') return;
 
@@ -210,6 +205,7 @@ export function stepMatch(match, dtSeconds, t) {
     return;
   }
 
+  advanceBiometricsSmoothing(dtSeconds);
   updateFighter(match, match.fighters[1], match.fighters[2], dtSeconds, t);
   updateFighter(match, match.fighters[2], match.fighters[1], dtSeconds, t);
 }
