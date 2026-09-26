@@ -2,14 +2,32 @@
 // Express router mounted at /api/ai
 //
 //   POST /api/ai/line   { moment, recent? } -> { text, ms }
+//   GET  /api/ai/tts?text=...  -> audio/mpeg (streamed on first request, disk-cached after)
 //
 // Keeps API keys server-side. The browser falls back to pre-written lines on any error.
 
 const express = require('express');
 const gemini = require('../ai/gemini');
+const elevenlabs = require('../ai/elevenlabs');
 const { MOMENT_HINTS } = require('../ai/prompts');
 
 const MAX_RECENT = 5;
+const MAX_TTS_CHARS = 200;
+
+// Tiny fixed-window limiter so a public /tts can't be used to burn ElevenLabs credits.
+function createRateLimiter({ max, windowMs, now = () => Date.now() }) {
+  const hits = new Map();
+  return (key) => {
+    const t = now();
+    const h = hits.get(key);
+    if (!h || t - h.start >= windowMs) {
+      hits.set(key, { start: t, count: 1 });
+      return true;
+    }
+    h.count += 1;
+    return h.count <= max;
+  };
+}
 
 // Trim the client payload down to what the prompt uses, so the browser can't send
 // arbitrary text into the prompt or blow up the request.
@@ -34,7 +52,12 @@ function sanitizeMoment(m) {
   };
 }
 
-function createAiRouter({ generateLine = gemini.generateLine } = {}) {
+function createAiRouter({
+  generateLine = gemini.generateLine,
+  ttsStream = elevenlabs.ttsStream,
+  ttsCache = elevenlabs.createTtsCache(),
+  ttsLimit = createRateLimiter({ max: 60, windowMs: 60000 }),
+} = {}) {
   const router = express.Router();
 
   router.post('/line', async (req, res) => {
@@ -55,9 +78,50 @@ function createAiRouter({ generateLine = gemini.generateLine } = {}) {
     }
   });
 
+  router.get('/tts', async (req, res) => {
+    const text = typeof req.query.text === 'string' ? req.query.text.trim() : '';
+    if (!text || text.length > MAX_TTS_CHARS) return res.status(400).json({ error: `text must be 1-${MAX_TTS_CHARS} chars` });
+
+    const key = elevenlabs.cacheKey(text);
+    if (ttsCache.has(key)) {
+      res.set('X-TTS-Cache', 'hit');
+      return res.type('audio/mpeg').sendFile(ttsCache.path(key), { maxAge: '1d' });
+    }
+    if (!ttsLimit(req.ip)) return res.status(429).json({ error: 'tts rate limit' });
+
+    const start = Date.now();
+    let upstream;
+    try {
+      upstream = await ttsStream(text);
+    } catch (err) {
+      console.warn('[ai] tts failed:', err.message);
+      return res.status(err.status || 502).json({ error: err.message });
+    }
+
+    res.set({ 'Content-Type': 'audio/mpeg', 'X-TTS-Cache': 'miss', 'X-TTS-Upstream-Ms': String(Date.now() - start) });
+    res.flushHeaders();
+    const chunks = [];
+    let aborted = false;
+    try {
+      for await (const chunk of upstream.body) {
+        const buf = Buffer.from(chunk);
+        chunks.push(buf);
+        if (!res.writableEnded) res.write(buf);
+      }
+    } catch (err) {
+      aborted = true;
+      console.warn('[ai] tts stream broke:', err.message);
+    }
+    res.end();
+    if (!aborted && chunks.length) {
+      try { ttsCache.write(key, Buffer.concat(chunks)); } catch (err) { console.warn('[ai] tts cache write failed:', err.message); }
+    }
+  });
+
   return router;
 }
 
 module.exports = createAiRouter();
 module.exports.createAiRouter = createAiRouter;
 module.exports.sanitizeMoment = sanitizeMoment;
+module.exports.createRateLimiter = createRateLimiter;

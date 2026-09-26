@@ -2,12 +2,13 @@
 // Entry point: wires listener -> announcer -> voice + on-screen caption.
 
 import { startCommentaryListener } from './listener.js';
-import { createAnnouncer, createSpeechSynthesisPlayer } from './announcer.js';
+import { createAnnouncer } from './announcer.js';
+import { createElevenLabsPlayer } from './elevenLabsPlayer.js';
 import { createGeminiLineSource } from './aiClient.js';
 
 export function initCommentary({
   bus,
-  player = createSpeechSynthesisPlayer(),
+  player = createElevenLabsPlayer(),
   lineSource = createGeminiLineSource(),
 } = {}) {
   const caption = createCaption();
@@ -23,6 +24,7 @@ export function initCommentary({
   return {
     announcer,
     lineSource,
+    player,
     stop() {
       listener.stop();
       announcer.stop();
