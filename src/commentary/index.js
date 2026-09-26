@@ -3,17 +3,26 @@
 
 import { startCommentaryListener } from './listener.js';
 import { createAnnouncer, createSpeechSynthesisPlayer } from './announcer.js';
+import { createGeminiLineSource } from './aiClient.js';
 
-export function initCommentary({ bus, player = createSpeechSynthesisPlayer(), getLine = null } = {}) {
+export function initCommentary({
+  bus,
+  player = createSpeechSynthesisPlayer(),
+  lineSource = createGeminiLineSource(),
+} = {}) {
   const caption = createCaption();
   const announcer = createAnnouncer({
     player,
-    getLine,
-    onLine: ({ text }) => caption.show(text),
+    getLine: lineSource?.getLine,
+    onLine: ({ text }) => {
+      caption.show(text);
+      lineSource?.remember(text);
+    },
   });
   const listener = startCommentaryListener({ bus, onMoment: announcer.enqueue });
   return {
     announcer,
+    lineSource,
     stop() {
       listener.stop();
       announcer.stop();
