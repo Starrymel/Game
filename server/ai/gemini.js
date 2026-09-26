@@ -110,6 +110,9 @@ async function generateLine(moment, { recent = [], ...opts } = {}) {
 
 // detail: match-detail shape (see summarize.js). Always resolves: falls back to a
 // stats-based template if Gemini is unavailable or returns junk.
+// Single-string form stored in matches.summary and shown on the dashboard.
+const summaryText = (s) => `${s.headline} ${s.analysis} Turning point: ${s.turningPoint}`;
+
 // If the main model is overloaded (503s happen under demand spikes), try Flash-Lite once.
 async function generateSummary(detail, opts = {}) {
   const compact = compactMatch(detail);
@@ -146,6 +149,6 @@ async function generateSummary(detail, opts = {}) {
 }
 
 module.exports = {
-  generateText, generateLine, generateSummary, cleanLine, warm, GeminiError,
+  generateText, generateLine, generateSummary, summaryText, cleanLine, warm, GeminiError,
   DEFAULT_LINE_MODEL, DEFAULT_SUMMARY_MODEL,
 };

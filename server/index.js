@@ -21,6 +21,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/log', require('./routes/log'));
 app.use('/api/matches', require('./routes/matches'));
+require('./lib/autoSummary').attach(ingest); // C: store the Gemini summary when a match ends (AUTO_SUMMARY=0 to disable)
 
 // Person C's router (Gemini / ElevenLabs proxy). Mounted only once ai.js exports an express Router.
 const ai = require('./routes/ai');

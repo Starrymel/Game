@@ -9,7 +9,7 @@ const MARKERS = {   // shape + label so identity never relies on color alone
   flinch:      { label: 'Flinch',       shape: 'circle' },
   heal_streak: { label: 'Heal streak',  shape: 'square' },
 };
-const state = { data: null, show: { ko: true, big_hit: true, flinch: true, heal_streak: true } };
+const state = { data: null, list: [], show: { ko: true, big_hit: true, flinch: true, heal_streak: true } };
 const mmss = ms => { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const fmt = (v, d = 0) => v == null || Number.isNaN(v) ? '–' : (+v).toFixed(d);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -29,8 +29,57 @@ async function init() {
   const want = new URLSearchParams(location.search).get('match');
   if (want && list.some(m => m.id === want)) sel.value = want;
   sel.onchange = () => load(sel.value);
+  state.list = list;
+  renderHistory();
   load(sel.value);
 }
+
+// ---- Previous matches (C): every logged match with result + summary preview; click to open.
+function renderHistory() {
+  const list = state.list.filter(m => m.ended_at || m.winner != null || m.duration_ms != null);
+  $('history').classList.toggle('hidden', list.length < 1);
+  const cur = state.data && state.data.match.id;
+  $('historyList').innerHTML = list.map(m => {
+    const names = [m.p1_name || 'Player 1', m.p2_name || 'Player 2'];
+    const when = new Date(m.started_at);
+    const res = (m.winner ? `${names[m.winner - 1]} won` : 'No result') + (m.duration_ms ? ' · ' + mmss(m.duration_ms) : '');
+    const prev = m.summary_preview ? `<span class="prev">${esc(m.summary_preview)}</span>` : '<span class="prev none">No analysis yet</span>';
+    return `<li><button data-id="${esc(m.id)}" ${m.id === cur ? 'aria-current="true"' : ''}>` +
+      `<span class="when">${when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` +
+      `<span class="who">${esc(names[0])} vs ${esc(names[1])}</span><span class="res">${esc(res)}</span>${prev}</button></li>`;
+  }).join('');
+  $('historyList').querySelectorAll('button').forEach(b => b.onclick = () => {
+    $('matchSel').value = b.dataset.id;
+    load(b.dataset.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+// Headline in bold, rest as-is (summaries are "Headline! Analysis... Turning point: ...").
+function renderSummary(text) {
+  const el = $('summary');
+  const m = /^(.{8,160}?[.!?])\s+([\s\S]*)$/.exec(text);
+  if (m) { el.innerHTML = `<b>${esc(m[1])}</b> ${esc(m[2])}`; } else el.textContent = text;
+  el.className = '';
+}
+
+// On-demand analysis for matches without one: C's Gemini route, then saved to the match.
+async function generateSummary() {
+  const btn = $('genBtn'), d = state.data;
+  btn.disabled = true; btn.textContent = 'Analyzing…';
+  try {
+    const { requestMatchSummary } = await import('/src/commentary/summary.js');
+    const s = await requestMatchSummary(d, { save: true });
+    if (state.data !== d) return;   // user switched match meanwhile
+    d.match.summary = s.text;
+    const row = state.list.find(m => m.id === d.match.id);
+    if (row) { row.has_summary = true; row.summary_preview = s.text.slice(0, 180); }
+    renderSummary(s.text); btn.classList.add('hidden'); renderHistory();
+  } catch (e) {
+    btn.textContent = 'Try again';
+  } finally { btn.disabled = false; }
+}
+$('genBtn').onclick = generateSummary;
 function showErr(msg) { $('main').classList.add('hidden'); const e = $('err'); e.textContent = msg; e.classList.remove('hidden'); }
 
 async function load(id) {
@@ -94,9 +143,11 @@ function render() {
   $('legend').querySelectorAll('input').forEach(cb => cb.onchange = () => { state.show[cb.dataset.k] = cb.checked; drawChart(); });
 
   $('summary').innerHTML = '';
-  if (m.summary) $('summary').textContent = m.summary;
+  if (m.summary) renderSummary(m.summary);
   else { $('summary').textContent = 'Analysis not generated yet.'; $('summary').className = 'muted'; }
-  if (m.summary) $('summary').className = '';
+  $('genBtn').classList.toggle('hidden', !!m.summary);
+  $('genBtn').textContent = 'Generate analysis';
+  renderHistory();
 
   const rows = d.events.filter(e => e.type !== 'hit');
   $('evTable').innerHTML = '<tr><th>Time</th><th>Player</th><th>Event</th><th>Detail</th></tr>' +

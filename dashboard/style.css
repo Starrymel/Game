@@ -59,6 +59,27 @@
   #err { color: var(--text); }
   @media (max-width: 640px) { h1 { font-size: 22px; } }
 
+  /* Previous matches (C) */
+  #genBtn { margin-top: 12px; }
+  #summary b { font-weight: 650; }
+  .history { list-style: none; margin: 0; padding: 0; }
+  .history li + li { border-top: 1px solid var(--line); }
+  .history button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 10px 8px; border-radius: 8px;
+    display: grid; grid-template-columns: minmax(96px, auto) 1fr auto; gap: 2px 14px; align-items: baseline; }
+  .history button:hover, .history button:focus-visible { background: var(--surface); }
+  .history button:focus-visible { outline: 2px solid var(--text-2); outline-offset: -2px; }
+  .history button[aria-current="true"] { background: var(--surface); box-shadow: inset 3px 0 0 var(--text-2); }
+  .history .when { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .history .who { font-weight: 600; min-width: 0; }
+  .history .res { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .history .prev { grid-column: 2 / -1; color: var(--text-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history .prev.none { color: var(--text-3); font-style: italic; }
+  @media (max-width: 640px) {
+    .history button { grid-template-columns: 1fr auto; }
+    .history .when { grid-column: 1 / -1; }
+    .history .prev { grid-column: 1 / -1; }
+  }
+
   /* embed mode: shown inside the game as an overlay */
-  body.embed header h1, body.embed #matchSel { display: none; }
+  body.embed header h1, body.embed #matchSel, body.embed #history { display: none; }
   body.embed .wrap { padding-top: 12px; }

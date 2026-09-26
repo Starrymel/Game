@@ -111,7 +111,7 @@ function createAiRouter({
       headline: s.headline,
       analysis: s.analysis,
       turningPoint: s.turningPoint,
-      text: `${s.headline} ${s.analysis} Turning point: ${s.turningPoint}`,
+      text: gemini.summaryText(s),
       source: s.source,
       ms: Date.now() - start,
     });
