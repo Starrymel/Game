@@ -112,30 +112,42 @@ window.addEventListener('pagehide', () => { if (m && !m.ended) endMatch(null, Da
 
 // ---- "Match analysis" button + overlay (self-contained; touches no game files)
 let uiEls = [];
-function closeAnalysis() { uiEls.forEach((e) => e.remove()); uiEls = []; }
+function closeAnalysis() { uiEls.forEach((e) => e.remove()); uiEls = []; if (closeOverlay) closeOverlay(); }
 
 function showAnalysisButton(id) {
   closeAnalysis();
   const btn = document.createElement('button');
-  btn.textContent = 'View match analysis';
+  btn.textContent = 'View round recap';
   btn.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;padding:12px 22px;font:600 16px system-ui,sans-serif;border:0;border-radius:10px;background:#2a78d6;color:#fff;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.4)';
   btn.onclick = () => openOverlay(id);
   document.body.appendChild(btn);
   uiEls.push(btn);
 }
 
+let closeOverlay = null;
+// The recap page asks us to close when Esc is pressed inside its iframe (the game can't see those keys).
+window.addEventListener('message', (e) => {
+  if (e.origin === location.origin && e.data && e.data.composure === 'close' && closeOverlay) closeOverlay();
+});
+
 function openOverlay(id) {
+  if (closeOverlay) closeOverlay();
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
   const frame = document.createElement('iframe');
-  frame.src = `/dashboard/?match=${encodeURIComponent(id)}&embed=1`;
-  frame.style.cssText = 'width:min(1240px,100%);height:100%;border:0;border-radius:12px;background:#1a1a19';
+  frame.src = `/dashboard/recap.html?match=${encodeURIComponent(id)}`;
+  frame.title = 'Round recap';
+  frame.style.cssText = 'width:min(780px,100%);height:min(600px,100%);border:1px solid #2c3040;border-radius:14px;background:#0b0d12;box-shadow:0 10px 40px rgba(0,0,0,.6)';
   const x = document.createElement('button');
-  x.textContent = '✕';
-  x.setAttribute('aria-label', 'Close analysis');
+  x.textContent = '\u2715';
+  x.setAttribute('aria-label', 'Close recap');
   x.style.cssText = 'position:absolute;top:14px;right:22px;z-index:61;width:38px;height:38px;border:0;border-radius:19px;background:#fff;color:#000;font-size:18px;cursor:pointer';
-  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  x.onclick = close; document.addEventListener('keydown', onKey);
-  wrap.append(frame, x); document.body.appendChild(wrap);
+  const onKey = (e) => { if (e.key === 'Escape') closeOverlay(); };
+  closeOverlay = () => { wrap.remove(); document.removeEventListener('keydown', onKey); closeOverlay = null; };
+  x.onclick = () => closeOverlay();
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) closeOverlay(); });   // click the dark backdrop to close
+  document.addEventListener('keydown', onKey);
+  wrap.append(frame, x);
+  document.body.appendChild(wrap);
+  frame.focus();
 }

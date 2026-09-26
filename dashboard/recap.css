@@ -1,0 +1,56 @@
+/* Owner: D. Compact recap styles. Dark only: it is shown over the game, which is dark. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0d12;
+  --panel: #1c1f2b;
+  --line: #2c3040;
+  --grid: #262a38;
+  --text: #f4f5f8;
+  --text-2: #b6b9c6;
+  --text-3: #8a8ea0;
+  --p1: #4a9eff;   /* matches the P1 fighter in the game */
+  --p2: #ff5f5f;   /* matches the P2 fighter in the game */
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; }
+
+.msg { text-align: center; color: var(--text-2); padding: 48px 16px; margin: 0; font-family: var(--mono); }
+
+.recap { max-width: 760px; margin: 0 auto; padding: 22px 20px 26px; animation: rise .28s ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .recap { animation: none; } }
+
+header { text-align: center; margin-bottom: 8px; }
+.banner { margin: 0; font: 800 clamp(28px, 7vw, 46px)/1.1 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.banner .chip { display: inline-block; width: .55em; height: .55em; border-radius: 3px; margin-right: .3em; vertical-align: .02em; }
+.sub { margin: 6px 0 0; color: var(--text-2); font: 14px var(--mono); }
+.sub .tag { border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; margin-left: 8px; color: var(--text-3); }
+
+.legend { display: flex; justify-content: center; gap: 20px; font: 13px var(--mono); color: var(--text-2); margin: 10px 0 2px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+
+#chart { width: 100%; height: auto; display: block; }
+#chart text { fill: var(--text-2); font-family: var(--mono); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 14px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.tile .label { font: 12px var(--mono); color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; }
+.tile .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.tile .v { font: 700 26px var(--mono); display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.tile .v i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+.summary { margin: 0 0 14px; text-align: center; font-size: 17px; min-height: 1.45em; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.summary.waiting { color: var(--text-3); font-family: var(--mono); font-size: 14px; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .summary.waiting { animation: none; } }
+
+.actions { text-align: center; }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel);
+  color: var(--text); text-decoration: none; font: 600 14px var(--mono); letter-spacing: .04em; }
+.btn:hover, .btn:focus-visible { border-color: var(--text-2); outline: none; }
+
+@media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .tile .v { font-size: 22px; } }

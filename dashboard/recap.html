@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Owner: D. Compact post-round recap, shown as an overlay inside the game: recap.html?match=ID -->
+<!-- The detailed version lives at index.html (linked from the "Full analysis" button). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Composure Recap</title>
+<link rel="stylesheet" href="recap.css">
+</head>
+<body>
+<p id="msg" class="msg" role="status">Loading match&hellip;</p>
+
+<main id="recap" class="recap" hidden>
+  <header>
+    <h1 id="banner" class="banner"></h1>
+    <p id="sub" class="sub"></p>
+  </header>
+
+  <div class="legend" id="legend"></div>
+  <svg id="chart" viewBox="0 0 700 252" role="img" aria-label="Health and heart rate for both players over the round"></svg>
+
+  <section class="stats" id="stats" aria-label="Round stats"></section>
+
+  <p id="summary" class="summary" role="status"></p>
+
+  <div class="actions">
+    <a id="full" class="btn" target="_blank" rel="noopener">Full analysis</a>
+  </div>
+</main>
+
+<script src="recap.js"></script>
+</body>
+</html>
