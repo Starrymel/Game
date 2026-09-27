@@ -18,6 +18,7 @@ import { createFaceControl } from './face/faceControl.js';
 import { connectNet } from './net.js';
 import { initNetStatus } from './ui/netStatus.js';
 import { initLobby } from './ui/lobby.js';
+import { initRoundEnd } from './ui/roundEnd.js';
 import { needsLobby } from './lobbyConfig.js';
 import { setPrizeEnabled } from './prize.js';
 import { setHazardEnabled } from './hazard.js';
@@ -95,8 +96,10 @@ function startGame() {
   }
   if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
 
+  // End of round: smile = play again, raise eyebrows = back to the start screen (also buttons; R and Esc).
+  const roundEnd = initRoundEnd({ faceControl: window.__faceControl || null, player });
   const match = runLoop({
-    onRender: (match) => render(ctx, match),
+    onRender: (match) => { render(ctx, match); roundEnd.update(!!match.over); },
   });
   window.__match = match; // debug/tests
   if (match && debug) initDebugPanel(match); // Only the host owns mutable game state. Developer tool: ?debug=1

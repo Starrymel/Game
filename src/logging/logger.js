@@ -10,6 +10,7 @@ const SAMPLE_MS = 500;          // biometric_sample fires ~10/s per player; stor
 const BIG_HIT_DAMAGE = 15;      // hits at/above this (or any special) also log a 'big_hit'
 const HEAL_STREAK_MS = 3000;    // continuous healing this long logs a 'heal_streak'
 const HEAL_GAP_MS = 400;        // a pause longer than this breaks the streak
+const AUTO_RECAP_MS = 1500;      // after the round ends, open the recap on its own after this long
 const MAX_FAILS = 5;            // stop sending after this many consecutive failures (until one succeeds)
 
 let m = null;                   // current match (one per round)
@@ -111,6 +112,9 @@ bus.on('round_end', ({ winner, t }) => {
   if (!m || m.ended) return;
   endMatch(winner, t);
   showAnalysisButton(m.id);
+  // Open the recap by itself (nobody has to click: the game is played with faces). A new round closes it again.
+  const id = m.id;
+  setTimeout(() => { if (m && m.id === id && m.ended && !closeOverlay) openOverlay(id); }, AUTO_RECAP_MS);
 });
 
 setInterval(() => flush(), FLUSH_MS);
@@ -139,11 +143,11 @@ window.addEventListener('message', (e) => {
 function openOverlay(id) {
   if (closeOverlay) closeOverlay();
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:2vh 2vw';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:2vh 2vw 110px';
   const frame = document.createElement('iframe');
   frame.src = `/dashboard/recap.html?match=${encodeURIComponent(id)}`;
   frame.title = 'Round recap';
-  frame.style.cssText = 'width:min(780px,100%);height:min(600px,100%);border:1px solid #ba8095;border-radius:14px;background:#fce0e9;box-shadow:0 10px 40px rgba(0,0,0,.6)';
+  frame.style.cssText = 'width:min(780px,100%);height:min(680px,100%);border:1px solid #ba8095;border-radius:14px;background:#fce0e9;box-shadow:0 10px 40px rgba(0,0,0,.6)';
   const x = document.createElement('button');
   x.textContent = '\u2715';
   x.setAttribute('aria-label', 'Close recap');

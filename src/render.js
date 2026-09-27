@@ -108,7 +108,7 @@ export function render(ctx, match) {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 28px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('Round over - press R to restart', STAGE.width / 2, STAGE.height / 2);
+    ctx.fillText('Round over', STAGE.width / 2, STAGE.height / 2);
     ctx.textAlign = 'left';
   }
 }
