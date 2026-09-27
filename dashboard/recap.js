@@ -28,131 +28,78 @@ async function fetchMatch() {
   return null;
 }
 
+// ---- The recap: pictures and short sentences, no graphs. Everything is worked out from the match data. ----
+const ICON = {
+  fist: '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 30c0-6 4-10 9-10h20c6 0 9 4 9 10v8c0 8-6 14-14 14h-6c-8 0-18-4-18-14z" fill="#ffd9a0"/><path d="M24 22v10M33 21v11M42 22v10" stroke-width="3.5"/><path d="M14 30v8" /></svg>',
+  laser: '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M4 32c8-12 20-16 28-16s20 4 28 16c-8 12-20 16-28 16S12 44 4 32z" fill="#fff"/><circle cx="32" cy="32" r="9" fill="#ffd9a0"/><circle cx="32" cy="32" r="3.5" fill="#42271f" stroke="none"/><path d="M50 32h12M48 24l11-6M48 40l11 6" stroke="#c42c43" stroke-width="4"/></svg>',
+  sword: '<img src="/assets/hazards/sword1.png" alt="" width="52" height="52">',
+  prize: '<img src="/assets/prizes/prize1.png" alt="" width="52" height="52">',
+  spark: '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6l6 18 18 8-18 8-6 18-6-18-18-8 18-8z" fill="#ffd9a0"/></svg>',
+  heart: '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 54C10 38 6 24 14 16c6-6 14-3 18 3 4-6 12-9 18-3 8 8 4 22-18 38z" fill="#f28ea0"/><path d="M14 34h10l4-8 6 14 4-6h12" stroke-width="3"/></svg>',
+};
+
 function analyse(d) {
   const names = [d.match.p1_name || 'Player 1', d.match.p2_name || 'Player 2'];
   const T = Math.max(d.match.duration_ms || 0, ...d.snapshots.map((s) => s.t), ...d.samples.map((s) => s.t), 1000);
   const ko = d.events.find((e) => e.type === 'ko');
-  let winner = d.match.winner || (ko && ko.payload && ko.payload.winner) || null;
-  const stats = [1, 2].map((p) => {
-    const hr = d.samples.filter((s) => s.player === p && s.hr != null).map((s) => s.hr);
-    return {
-      peakHr: hr.length ? Math.max(...hr) : null,
-      dmg: d.events.filter((e) => e.type === 'hit' && e.player === p).reduce((a, e) => a + (+e.payload.damage || 0), 0),
-      flinches: d.events.filter((e) => e.type === 'flinch' && e.player === p).length,
-    };
+  const winner = d.match.winner || (ko && ko.payload && ko.payload.winner) || null;
+  const last = d.snapshots.length ? d.snapshots[d.snapshots.length - 1] : null;
+  const bio = [1, 2].map((p) => {
+    const hr = d.samples.filter((s) => s.player === p && s.hr != null);
+    const peak = hr.length ? hr.reduce((a, b) => (b.hr > a.hr ? b : a)) : null;
+    return { peakHr: peak ? peak.hr : null, peakAt: peak ? peak.t : null };
   });
   const hits = d.events.filter((e) => e.type === 'hit');
   const biggest = hits.length ? hits.reduce((a, b) => ((+b.payload.damage || 0) > (+a.payload.damage || 0) ? b : a)) : null;
   const live = d.samples.some((s) => s.source === 'presage');
-  return { names, T, ko, winner, stats, biggest, live };
+  const fx = (d.stats && d.stats.players) || null;
+  return { names, T, winner, ko, last, bio, biggest, live, fx };
+}
+
+const pips = (landed, thrown, p) => {
+  const n = Math.min(thrown == null ? landed : thrown, 12);
+  if (!n) return '<span class="none">-</span>';
+  return Array.from({ length: n }, (_, i) => `<i class="${i < Math.min(landed, n) ? 'on' : ''}" style="--c:var(--p${p})"></i>`).join('') + (thrown > 12 ? '<em>+</em>' : '');
+};
+const who = (p) => `<i class="dot" style="background:var(--p${p})"></i>`;
+
+function card({ icon, title, rows, more }) {
+  return `<button type="button" class="card" aria-expanded="false"><span class="head"><span class="ico">${icon}</span><b>${title}</b></span>${rows.map((r) => `<span class="line">${r}</span>`).join('')}<span class="more">${more || ''}</span></button>`;
 }
 
 function render(d) {
   const a = analyse(d);
   const [n1, n2] = a.names;
+  const W = a.winner;
 
-  $('banner').innerHTML = a.winner
-    ? `<span class="chip" style="background:var(--p${a.winner})"></span>${esc(a.names[a.winner - 1])} wins`
-    : 'Draw';
-  $('sub').innerHTML = `${mmss(a.T)} round<span class="tag">${a.live ? 'Live Presage biometrics' : 'Mock biometrics'}</span>`;
+  // Headline: the two fighters, the winner in colour with a crown, the other one greyed out.
+  const art = (p, file) => `<figure class="fighter ${W ? (W === p ? 'won' : 'lost') : ''}" style="--c:var(--p${p})"><img src="/assets/characters/${file}" alt="${esc(a.names[p - 1])}">${W === p ? '<span class="crown" aria-hidden="true">&#128081;</span>' : ''}<figcaption>${esc(a.names[p - 1])}</figcaption></figure>`;
+  $('banner').innerHTML = `${art(1, 'dog.png')}<div class="mid"><h1>${W ? esc(a.names[W - 1]) + ' wins!' : 'A draw!'}</h1><p>${mmss(a.T)} round<span class="tag">${a.live ? 'live heart rate' : 'simulated heart rate'}</span></p></div>${art(2, 'bunny.png')}`;
 
-  $('legend').innerHTML = [1, 2].map((p) =>
-    `<span><i style="background:var(--p${p})"></i>${esc(a.names[p - 1])}</span>`).join('');
+  // Health left at the end: two fat bars.
+  const hp = (p) => { const v = a.last ? Math.max(0, Math.round(a.last['p' + p + '_hp'])) : null; return `<div class="hp"><span>${who(p)}${esc(a.names[p - 1])}</span><div class="bar"><div style="width:${v == null ? 0 : v}%;background:var(--p${p})"></div></div><b>${v == null ? '-' : v}</b></div>`; };
+  $('hpbars').innerHTML = hp(1) + hp(2);
 
-  const tile = (label, f) => `<div class="tile"><div class="label">${label}</div><div class="row">` +
-    [0, 1].map((i) => `<span class="v"><i style="background:var(--p${i + 1})"></i>${f(a.stats[i], i)}</span>`).join('') + '</div></div>';
-  const fx = (d.stats && d.stats.players) || null;      // fight numbers counted by the server from the match log
-  const ft = (i) => fx && fx[i + 1];
-  const landed = (o) => (o.thrown == null ? `${o.landed}` : `${o.landed}/${o.thrown}`);
-  $('stats').innerHTML = tile('Peak HR', (s) => fmt(s.peakHr)) + tile('Flinches', (s) => s.flinches) +
-    (fx
-      ? tile('Damage dealt', (_, i) => ft(i).damageDealt) + tile('Damage taken', (_, i) => ft(i).damageTaken) +
-        tile('Punches landed', (_, i) => landed(ft(i).punches)) + tile('Lasers landed', (_, i) => landed(ft(i).lasers)) +
-        tile('Swords dodged', (_, i) => ft(i).swordsDodged) + tile('Prizes caught', (_, i) => ft(i).prizesCaught)
-      : tile('Damage taken', (s) => fmt(s.dmg)));
+  const f = a.fx;
+  const cards = [];
+  if (f) {
+    const L = (o) => (o.thrown == null ? `${o.landed} hit` : o.thrown ? `${o.landed}/${o.thrown}` : '');
+    cards.push(card({ icon: ICON.fist, title: 'Punches', rows: [1, 2].map((p) => `${who(p)}<span class="pips">${pips(f[p].punches.landed, f[p].punches.thrown, p)}</span><small>${L(f[p].punches)}</small>`), more: `Damage dealt: ${f[1].damageDealt} vs ${f[2].damageDealt}` }));
+    cards.push(card({ icon: ICON.laser, title: 'Eye lasers', rows: [1, 2].map((p) => `${who(p)}<span class="pips">${pips(f[p].lasers.landed, f[p].lasers.thrown, p)}</span><small>${L(f[p].lasers)}</small>`), more: a.biggest ? `Biggest hit: ${fmt(a.biggest.payload.damage)} damage on ${esc(a.names[a.biggest.player - 1])} at ${mmss(a.biggest.t)}` : '' }));
+    cards.push(card({ icon: ICON.sword, title: 'Falling swords', rows: [1, 2].map((p) => `${who(p)}<b class="big">${f[p].swordsDodged}</b><small>dodged</small><b class="big bad">${f[p].swordsHit}</b><small>hit</small>`), more: `Sword damage: ${f[1].swordDamage} vs ${f[2].swordDamage}` }));
+    cards.push(card({ icon: ICON.prize, title: 'Prizes', rows: [1, 2].map((p) => `${who(p)}<b class="big">${f[p].prizesCaught}</b><small>caught${f[p].prizeHealed ? ` (+${f[p].prizeHealed} HP)` : ''}</small>`), more: a.fx && d.stats.prizesMissed ? `${d.stats.prizesMissed} prize${d.stats.prizesMissed > 1 ? 's' : ''} nobody grabbed` : '' }));
+    cards.push(card({ icon: ICON.spark, title: 'Damage', rows: [1, 2].map((p) => `${who(p)}<small>dealt</small><b class="big">${f[p].damageDealt}</b><small>took</small><b class="big bad">${f[p].damageTaken}</b>`), more: `Blocked hits: ${f[1].blocked} vs ${f[2].blocked}` }));
+  }
+  const cracked = a.bio[0].peakHr != null && a.bio[1].peakHr != null && a.bio[0].peakHr !== a.bio[1].peakHr ? (a.bio[0].peakHr > a.bio[1].peakHr ? 1 : 2) : null;
+  const flinch = (p) => d.events.filter((e) => e.type === 'flinch' && e.player === p).length;
+  cards.push(card({ icon: ICON.heart, title: 'Heart', rows: [1, 2].map((p) => `${who(p)}<b class="big">${fmt(a.bio[p - 1].peakHr)}</b><small>bpm peak</small><b class="big bad">${flinch(p)}</b><small>flinches</small>`), more: cracked ? `${esc(a.names[cracked - 1])}'s heart spiked highest${a.bio[cracked - 1].peakAt != null ? ' at ' + mmss(a.bio[cracked - 1].peakAt) : ''}` : '' }));
+  $('cards').innerHTML = cards.join('');
+  $('cards').querySelectorAll('.card').forEach((c, i) => {
+    c.style.animationDelay = `${120 + i * 90}ms`;
+    c.addEventListener('click', () => { const on = c.classList.toggle('open'); c.setAttribute('aria-expanded', String(on)); });
+  });
 
   $('full').href = './?match=' + encodeURIComponent(matchId);
-  drawChart(d, a);
-}
-
-// One chart, one shared time axis, two stacked panels: HP on top, heart rate below. No dual y-axes.
-function drawChart(d, a) {
-  const W = 700, L = 46, R = 70;
-  const HP = [22, 148], HR = [178, 226], AX = 226;
-  const X = (t) => L + (t / a.T) * (W - L - R);
-  const hpY = (v) => HP[1] - (v / 100) * (HP[1] - HP[0]);
-  const allHr = d.samples.filter((s) => s.hr != null).map((s) => s.hr);
-  const hasHr = allHr.length > 1;
-  const lo = hasHr ? Math.floor(Math.min(...allHr) / 10) * 10 - 5 : 50;
-  const hi = hasHr ? Math.ceil(Math.max(...allHr) / 10) * 10 + 5 : 150;
-  const hrY = (v) => HR[1] - ((v - lo) / (hi - lo)) * (HR[1] - HR[0]);
-  let s = '';
-
-  // grid + y labels
-  for (const v of [0, 50, 100]) s += `<line x1="${L}" x2="${W - R}" y1="${hpY(v)}" y2="${hpY(v)}" stroke="var(--grid)"/><text x="${L - 8}" y="${hpY(v) + 4}" text-anchor="end" font-size="12">${v}</text>`;
-  s += `<text x="${L}" y="${HP[0] - 8}" font-size="12" style="fill:var(--text-3)">HEALTH</text>`;
-  s += `<text x="${L}" y="${HR[0] - 8}" font-size="12" style="fill:var(--text-3)">HEART RATE (bpm)</text>`;
-  if (hasHr) {
-    for (const v of [lo + 5, hi - 5]) s += `<line x1="${L}" x2="${W - R}" y1="${hrY(v)}" y2="${hrY(v)}" stroke="var(--grid)"/><text x="${L - 8}" y="${hrY(v) + 4}" text-anchor="end" font-size="12">${Math.round(v)}</text>`;
-  } else {
-    s += `<text x="${(L + W - R) / 2}" y="${(HR[0] + HR[1]) / 2 + 4}" text-anchor="middle" font-size="13" style="fill:var(--text-3)">No heart-rate data for this round</text>`;
-  }
-
-  // time axis
-  const step = [5000, 10000, 15000, 30000, 60000].find((st) => a.T / st <= 6) || 60000;
-  for (let t = 0; t <= a.T; t += step) s += `<line x1="${X(t)}" x2="${X(t)}" y1="${AX}" y2="${AX + 4}" stroke="var(--text-3)"/><text x="${X(t)}" y="${AX + 18}" text-anchor="middle" font-size="12">${mmss(t)}</text>`;
-  s += `<line x1="${L}" x2="${W - R}" y1="${AX}" y2="${AX}" stroke="var(--line)"/>`;
-
-  // lines
-  const line = (pts, p) => (pts.length ? `<polyline fill="none" stroke="var(--p${p})" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(' ')}"/>` : '');
-  const ends = { hp: [], hr: [] };
-  for (const p of [1, 2]) {
-    const sn = d.snapshots.filter((x) => x['p' + p + '_hp'] != null);
-    s += line(sn.map((x) => `${X(x.t).toFixed(1)},${hpY(x['p' + p + '_hp']).toFixed(1)}`), p);
-    if (sn.length) ends.hp.push({ p, y: hpY(sn[sn.length - 1]['p' + p + '_hp']), x: X(sn[sn.length - 1].t) });
-    const sm = d.samples.filter((x) => x.player === p && x.hr != null);
-    s += line(sm.map((x) => `${X(x.t).toFixed(1)},${hrY(x.hr).toFixed(1)}`), p);
-    if (sm.length) ends.hr.push({ p, y: hrY(sm[sm.length - 1].hr), x: X(sm[sm.length - 1].t) });
-  }
-  // direct labels at the line ends, nudged apart when they'd overlap
-  for (const list of [ends.hp, ends.hr]) {
-    list.sort((u, v) => u.y - v.y);
-    if (list.length === 2 && list[1].y - list[0].y < 15) { const mid = (list[0].y + list[1].y) / 2; list[0].y = mid - 8; list[1].y = mid + 8; }
-    for (const e of list) s += `<text x="${e.x + 8}" y="${e.y + 4}" font-size="13" style="fill:var(--text)">${esc(a.names[e.p - 1])}</text>`;
-  }
-
-  // markers: the KO (vertical line + diamond) and the single biggest hit (triangle on the victim's HP line)
-  const tri = (cx, cy, r) => `<polygon points="${cx},${cy - r} ${cx + r},${cy + r * 0.8} ${cx - r},${cy + r * 0.8}" fill="var(--text)" stroke="var(--bg)" stroke-width="2"/>`;
-  if (a.biggest) {
-    const v = a.biggest.player, snap = d.snapshots.length ? d.snapshots.reduce((b, c) => (Math.abs(c.t - a.biggest.t) < Math.abs(b.t - a.biggest.t) ? c : b)) : null;
-    const hp = snap ? snap['p' + v + '_hp'] : null;
-    if (hp != null) {
-      const cx = X(a.biggest.t), cy = hpY(hp);
-      // label goes in the empty space below the marker (lines usually sit near the top); flip above if that would hit the axis
-      const below = cy + 26 <= HP[1] + 6;
-      const lx = Math.min(Math.max(cx, L + 34), W - R - 34);
-      s += `<g><title>Biggest hit: ${fmt(a.biggest.payload.damage)} damage on ${esc(a.names[v - 1])}</title>${tri(cx, cy, 8)}</g>`;
-      s += `<text x="${lx}" y="${below ? cy + 26 : cy - 14}" text-anchor="middle" font-size="12" style="fill:var(--text)">Biggest hit</text>`;
-    }
-  }
-  // sword hits (x) and prizes caught (dot) on the victim's / catcher's health line
-  const hpAt = (t, p) => { const sn = d.snapshots.filter((x) => x['p' + p + '_hp'] != null); return sn.length ? sn.reduce((b, c) => (Math.abs(c.t - t) < Math.abs(b.t - t) ? c : b))['p' + p + '_hp'] : null; };
-  let hasSword = false, hasPrize = false;
-  for (const e of d.events) {
-    if ((e.type !== 'sword_hit' && e.type !== 'prize_caught') || !e.player) continue;
-    const hp = hpAt(e.t, e.player); if (hp == null) continue;
-    const cx = X(e.t), cy = hpY(hp);
-    if (e.type === 'sword_hit') { hasSword = true; s += `<g><title>Sword hit ${esc(a.names[e.player - 1])}: ${fmt(e.payload.damage)} damage</title><path d="M${cx - 5},${cy - 5} L${cx + 5},${cy + 5} M${cx + 5},${cy - 5} L${cx - 5},${cy + 5}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/></g>`; }
-    else { hasPrize = true; s += `<g><title>${esc(a.names[e.player - 1])} caught a prize (+${fmt(e.payload.hp)} HP)</title><circle cx="${cx}" cy="${cy}" r="6" fill="var(--bg)" stroke="var(--text)" stroke-width="3"/></g>`; }
-  }
-  if (hasSword || hasPrize) s += `<text x="${W - R}" y="${HP[0] - 8}" text-anchor="end" font-size="12" style="fill:var(--text-3)">${hasSword ? '\u2715 sword hit  ' : ''}${hasPrize ? '\u25EF prize' : ''}</text>`;
-  if (a.ko) {
-    const x = X(a.ko.t);
-    s += `<line x1="${x}" x2="${x}" y1="${HP[0] - 4}" y2="${AX}" stroke="var(--text)" stroke-opacity=".55" stroke-width="2" stroke-dasharray="4 4"/>`;
-    s += `<g><title>KO</title><polygon points="${x},${HP[0] - 16} ${x + 9},${HP[0] - 7} ${x},${HP[0] + 2} ${x - 9},${HP[0] - 7}" fill="var(--text)" stroke="var(--bg)" stroke-width="2"/></g>`;
-    s += `<text x="${x}" y="${HP[0] - 22}" text-anchor="middle" font-size="12" font-weight="700" style="fill:var(--text)">KO</text>`;
-  }
-  $('chart').innerHTML = s;
 }
 
 // The summary line. If this match has no saved summary yet, ask Person C's route (/api/ai/summary) to write one
