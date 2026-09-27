@@ -1,3 +1,4 @@
+import { isHeld } from './hold.js';
 import { bus } from './eventBus.js';
 import { Mechanics } from './mechanics.js';
 import { getBiometrics, advanceBiometricsSmoothing } from './biometrics.js';
@@ -322,7 +323,7 @@ export function runLoop({ onSnapshot, onRender } = {}) {
     snapshotAccMs += frameMs;
 
     // Online, the host holds the match still until Player 2 is in the room (so the clock doesn't run on an empty seat).
-    if (isNetWaiting()) physicsAccMs = 0;
+    if (isNetWaiting() || isHeld()) physicsAccMs = 0;   // also stands still during calibration (this laptop's or the other player's)
     while (physicsAccMs >= STEP_MS) {
       stepMatch(match, STEP_MS / 1000, Date.now());
       physicsAccMs -= STEP_MS;

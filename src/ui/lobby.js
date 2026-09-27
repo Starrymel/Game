@@ -1,5 +1,5 @@
 // Start screen: three big choices (Player 1, Player 2, this laptop only). Works with the face, the keyboard and the mouse:
-//   face:      tilt your head left/right to move the highlight, raise your eyebrows (or smile) to pick it
+//   face:      SMILE = Player 1, RAISE EYEBROWS = Player 2 (hold it until the bar fills)
 //   keyboard:  Left/Right (or Tab) to move, Enter/Space to pick
 //   mouse:     click
 // Picking reloads the page into the right role. Everyone shares one room for now (see lobbyConfig.js).
@@ -21,7 +21,7 @@ export const LOBBY_PACE = {
   baselineMs: 1200,      // the resting position is measured over the LAST this-long of the warm-up (sit still then)
   browMargin: 0.15,      // to choose, eyebrows/smile must beat your own resting level by at least this much
   selfCorrect: 0.02,     // while your head is near neutral, the baseline follows slow shifts (sinking into the chair)
-  selectHoldMs: 1200,    // eyebrows (or a smile) must be HELD this long to choose; a bar fills on the card meanwhile
+  selectHoldMs: 1000,    // eyebrows (or a smile) must be HELD this long to choose; a bar fills on the card meanwhile
 };
 // Pure helpers (unit tested).
 export function median(xs) {
@@ -71,8 +71,8 @@ const CSS = `
 `;
 
 const LABELS = {
-  p1: { title: "I'm Player 1", note: 'starts the match' },
-  p2: { title: "I'm Player 2", note: 'joins Player 1' },
+  p1: { title: "I'm Player 1", note: 'starts the match - SMILE' },
+  p2: { title: "I'm Player 2", note: 'joins Player 1 - RAISE EYEBROWS' },
   local: { title: 'This laptop only', note: 'two players, one screen' },
 };
 
@@ -91,11 +91,10 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
       ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><b>${LABELS[id].title}</b><small data-note="${id}">${LABELS[id].note}</small><span class="prog" data-prog="${id}"></span></button>`).join('')}
     </div>
     <div class="help" id="lobby-help">
-      <p><b>Face:</b> tilt your head left or right and hold it a moment to move the highlight (keep tilting to keep moving, let go to stop). To choose, <b>raise your eyebrows</b> or <b>smile</b> and hold it until the bar fills.</p>
+      <p><b>Face:</b> <b>smile</b> and hold it to be Player 1. <b>Raise your eyebrows</b> and hold them to be Player 2. Keep it up until the bar fills.</p>
       <p><b>Keyboard:</b> Left / Right to move, Enter to choose. <b>Mouse:</b> click.</p>
     </div>
     <p class="status" id="lobby-face" aria-live="polite"></p>
-    <div class="gauge" id="lobby-gauge" aria-hidden="true" hidden><i style="left:${50 - 10 / 60 * 100}%"></i><i style="left:${50 + 10 / 60 * 100}%"></i><b id="lobby-dot"></b></div>
     <p class="sr" id="lobby-announce" aria-live="assertive"></p>
     <div class="row"><button type="button" class="link" id="lobby-facetoggle"></button></div>
   </div>`;
@@ -111,14 +110,13 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   let readyAt = 0;           // when the camera became ready (0 = not ready)
   let selectSince = 0;       // when the current eyebrow/smile hold began
   let baseReady = false;     // the resting position has been measured (face input counts from then on)
-  let headTilted = false;    // any head tilt right now (a tilt shifts the face and could look like an eyebrow raise)
 
   function setFocus(i, announce = true) {
     if (i === focus && announce) return;
     focus = i; focusedAt = now();
     paint();
     btn(OPTIONS[focus]).focus({ preventScroll: true });        // keeps keyboard and face in step
-    if (announce) $('#lobby-announce').textContent = `${LABELS[OPTIONS[focus]].title}. Raise your eyebrows or press Enter to choose.`;
+    if (announce) $('#lobby-announce').textContent = `${LABELS[OPTIONS[focus]].title}. Press Enter to choose.`;
   }
 
   // Progress bar on the highlighted card while a choice is being held.
@@ -180,8 +178,8 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
       case 'ready': {
         if (w) return w;
         const left = readyAt ? Math.ceil((PACE.warmupMs - (now() - readyAt)) / 1000) : 0;
-        if (left <= 0 && readyAt && !baseReady) return 'Hold still... measuring your resting position';
-        return left > 0 ? (left <= 1 ? 'Hold still... measuring your resting position' : `Face controls start in ${left}... (read the tips above, then sit comfortably)`) : 'Face controls are ready. Tilt and hold to move; hold your eyebrows up to choose.';
+        if (left <= 0 && !baseReady) return 'Relax your face for a moment...';
+        return left > 0 ? (left <= 1 ? 'Relax your face for a moment...' : `Starting in ${left}... (sit comfortably, relaxed face)`) : 'Ready! Smile for Player 1, or raise your eyebrows for Player 2 (hold it until the bar fills).';
       }
       case 'error': return `Face controls did not start (${faceControl.error?.message || 'camera problem'}). You can still use the keyboard or the mouse.`;
       default: return 'Face controls are off. Use the keyboard or the mouse.';
@@ -207,61 +205,34 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     // Head: hold a tilt for moveHoldMs to move one step; keep holding and it steps again every repeatMs (it stops at the ends).
     // Uses the head angle itself (not the gameplay left/right flags), with its own gentler threshold, and forgives short
     // tracking dropouts, so it does not need a big or perfectly steady tilt. Drift is off here: a held tilt must not fade away.
-    faceControl.head.options.drift = 0;
-    // Resting position, measured over the last part of the warm-up (not at page load, when you may still be settling in).
+    // One gesture per seat, no head movement needed: SMILE = Player 1, RAISE EYEBROWS = Player 2. Hold it until the bar fills.
+    // The resting level of each is measured during the last part of the warm-up, so a resting face never chooses by itself,
+    // and the gesture must clearly beat both the calibrated threshold and your own resting level.
     const samples = [];
-    let base = null;
-    // Only taken once the head has been still for baselineMs (a tilt during the countdown just makes it wait a little longer).
+    let base = null, holdKind = null;
     const ensureBase = (t) => {
-      if (!base && warmedUp()) {
-        const rolls = samples.filter((x) => t - x.t <= PACE.baselineMs && Number.isFinite(x.roll)).map((x) => x.roll);
-        if (rolls.length >= 3 && Math.max(...rolls) - Math.min(...rolls) <= PACE.stillDeg) { base = baselineFrom(samples, t, PACE.baselineMs); baseReady = true; paintFace(); }
-      }
+      if (!base && warmedUp()) { base = baselineFrom(samples, t, PACE.baselineMs); baseReady = true; paintFace(); }
       return base;
     };
-    const dot = $('#lobby-dot'), gauge = $('#lobby-gauge');
-    let dir = 0, since = 0, lastSeen = 0, lastStep = 0;
-    offs.push(bus.on('head_state', (m) => {
-      if (m.player !== 1 || faceControl.status !== 'ready') return;
-      const st = m.state, raw = st?.values?.roll, t = now();
-      if (raw == null) return;
-      if (!base) { samples.push({ t, roll: raw, brows: NaN, smile: NaN }); if (samples.length > 400) samples.shift(); }
-      const b = ensureBase(t);
-      if (!b) return;
-      const roll = raw - b.roll;
-      b.roll = driftBaseline(b.roll, raw, PACE.tiltReleaseDeg, PACE.selfCorrect);
-      gauge.hidden = false;
-      dot.style.left = `${50 + Math.max(-30, Math.min(30, -roll)) / 60 * 100}%`;
-      headTilted = Math.abs(roll) > PACE.tiltReleaseDeg || !!(st.up || st.down);
-      // + roll = head tilted to the person's left. Once tilting, stay "on" until back inside the release angle.
-      const onLeft = roll >= (dir === -1 ? PACE.tiltReleaseDeg : PACE.tiltDeg);
-      const onRight = roll <= -(dir === 1 ? PACE.tiltReleaseDeg : PACE.tiltDeg);
-      const now_ = onLeft ? -1 : onRight ? 1 : 0;
-      if (now_ !== 0) {
-        lastSeen = t;
-        if (now_ !== dir) { dir = now_; since = t; lastStep = 0; }
-      } else if (t - lastSeen > PACE.gapToleranceMs) { dir = 0; since = 0; lastStep = 0; }
-      if (dir === 0) return;
-      const due = lastStep === 0 ? t - since >= PACE.moveHoldMs : t - lastStep >= PACE.repeatMs;
-      if (due) { lastStep = t; setFocus(moveFocus(focus, dir, status)); }
-    }));
-
-    // Choosing: eyebrows (or a smile) HELD for selectHoldMs, clearly above YOUR resting level, with the head still and the
-    // highlight settled. A bar on the card fills while you hold; letting go resets it.
     offs.push(bus.on('face_values', (m) => {
       if (m.player !== 1 || faceControl.status !== 'ready' || closed) return;
       const t = now(), sc = m.scores;
       if (sc && !base) { samples.push({ t, roll: NaN, brows: KINDS.brows(sc), smile: KINDS.smile(sc) }); if (samples.length > 400) samples.shift(); }
       const b = ensureBase(t);
-      if (!b) { selectSince = 0; setBar('select', 0); return; }
+      const reset = () => { selectSince = 0; holdKind = null; setBar('select', 0); };
+      if (!b || !sc) return reset();
       const s = faceControl.settings;
-      // (the resting level is capped below the threshold, so a raise during the countdown can never lock you out)
-    const active = !!sc && !headTilted && (KINDS.brows(sc) > Math.max(s.browsUp, Math.min(b.brows, 0.75 * s.browsUp) + PACE.browMargin) || KINDS.smile(sc) > Math.max(s.smileUp, Math.min(b.smile, 0.75 * s.smileUp) + PACE.browMargin));
-      if (!active || t - focusedAt < PACE.settleMs) { selectSince = 0; setBar('select', 0); return; }
-      if (!selectSince) selectSince = t;
+      // how far above the needed level each gesture is (negative = not doing it); the stronger one wins
+      const smileX = KINDS.smile(sc) - Math.max(s.smileUp, Math.min(b.smile, 0.75 * s.smileUp) + PACE.browMargin);
+      const browsX = KINDS.brows(sc) - Math.max(s.browsUp, Math.min(b.brows, 0.75 * s.browsUp) + PACE.browMargin);
+      const kind = smileX > 0 && smileX >= browsX ? 'smile' : browsX > 0 ? 'brows' : null;
+      if (!kind) return reset();
+      const id = kind === 'smile' ? 'p1' : 'p2';
+      if (!optionEnabled(id, status)) { reset(); return; }          // that seat is taken: nothing to choose
+      if (kind !== holdKind) { holdKind = kind; selectSince = t; setFocus(OPTIONS.indexOf(id)); }
       const k = Math.min(1, (t - selectSince) / PACE.selectHoldMs);
       setBar('select', k);
-      if (k >= 1) { selectSince = 0; choose(OPTIONS[focus]); }
+      if (k >= 1) { selectSince = 0; holdKind = null; choose(id); }
     }));
     $('#lobby-facetoggle').addEventListener('click', () => { if (faceControl.status === 'off') faceControl.start(); else faceControl.stop(); });
     if (faceControl.settings.enabled) faceControl.start();

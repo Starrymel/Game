@@ -3,6 +3,7 @@
 // own local player's input and renders whatever state the host sends back.
 // This sidesteps deterministic-lockstep desync entirely (see CONTRACT.md) --
 // there's exactly one place gameplay math ever runs.
+import { isLocalHold, setPeerHold, onLocalHoldChange } from './hold.js';
 import { setRemoteInput, readInput } from './input.js';
 import { bus } from './eventBus.js';
 import { isForwardableSample, acceptGuestSample } from './netconfig.js';
@@ -52,12 +53,16 @@ function handleMessage(evt) {
   if (msg.type === 'peer') {
     takenTries = 0;                            // the relay gave us the seat (a refused connection never gets this far)
     peerKnown = true; peerPresent = !!msg.present;
+    if (!peerPresent) setPeerHold(false);
+    if (peerPresent && isLocalHold()) send({ type: 'hold', on: true });   // the other one just arrived: tell them we are still calibrating
     bus.emit('net_peer', { present: peerPresent });
     bus.emit('net_status', getNetInfo());
   } else if (msg.type === 'input' && role === 'host') {
     setRemoteInput(remotePlayer, msg.input);
   } else if (msg.type === 'state' && role === 'guest') {
     onRemoteState?.(msg.state);
+  } else if (msg.type === 'hold') {
+    setPeerHold(!!msg.on);
   } else if (msg.type === 'restart' && role === 'host') {
     onRestartRequested?.();
   } else if (msg.type === 'bio' && role === 'host') {
@@ -107,6 +112,7 @@ export function connectNet({ relayUrl, asRole, myPlayer }) {
   try { roomName = new URL(relayUrl).searchParams.get('room') || 'default'; } catch (_) { roomName = 'default'; }
   wanted = true; peerKnown = false; peerPresent = false; takenTries = 0; retryDelay = 1000; rejectedCode = null;
   openSocket();
+  onLocalHoldChange((on) => send({ type: 'hold', on }));
 
   if (role === 'guest') {
     // Input goes out at a steady rate whenever the connection is up (send() skips while it is down).

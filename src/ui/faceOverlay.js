@@ -2,6 +2,7 @@
 // (dark room, face lost, ...), and a small chip to recenter or switch to the keyboard. Views only: all logic
 // lives in face/faceControl.js.
 import { bus } from '../eventBus.js';
+import { setLocalHold } from '../hold.js';
 import { actionFor, ACTION_LABELS, LABELS } from '../face/actions.js';
 
 export function cameraErrorText(e) {
@@ -68,8 +69,8 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
   let armed = false;          // the head must come back to neutral once before a tilt can skip
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function show(html) { overlay.innerHTML = `<div class="card">${html}</div>`; overlay.hidden = false; shownAt = now(); armed = false; }
-  const hide = () => { overlay.hidden = true; step = 'hidden'; clearTimeout(closeTimer); personalToken++; renderChip(); };
+  function show(html) { setLocalHold(true); overlay.innerHTML = `<div class="card">${html}</div>`; overlay.hidden = false; shownAt = now(); armed = false; }
+  const hide = () => { setLocalHold(false); overlay.hidden = true; step = 'hidden'; clearTimeout(closeTimer); personalToken++; renderChip(); };
 
   function warningsHtml() {
     return control.warnings.length ? `<p class="warn" id="face-overlay-warn">${control.warnings.map((w) => w.text).join(' ')}</p>` : '';
