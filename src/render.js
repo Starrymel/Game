@@ -1,5 +1,5 @@
 import { drawHUD } from './ui/hud.js';
-import { beginEffects, drawEffects } from './ui/effects.js';
+import { beginEffects, drawEffects, impactPoint } from './ui/effects.js';
 import { STAGE, hurtbox, hitbox } from './fighter.js';
 import { drawPrize } from './ui/prizeRender.js';
 
@@ -50,13 +50,18 @@ function drawArena(ctx) {
   ctx.drawImage(arena, (STAGE.width - width) / 2, STAGE.height - height, width, height);
 }
 
-function drawAttack(ctx, fighter) {
+function drawAttack(ctx, fighter, opponent) {
   const box = hitbox(fighter);
   if (!box || !ready(explosion)) return;
-  const height = fighter.attack.kind === 'special' ? 210 : 144;
+  const ranged = fighter.attack.kind === 'laser' || fighter.attack.kind === 'special';
+  // Ranged attacks: the explosion goes on the target at the end of the beam (only when it lands), not at the middle
+  // of their long hit area. Close-range punches keep drawing at the middle of their (short) hit area.
+  const impact = ranged ? impactPoint(fighter, opponent) : null;
+  if (ranged && !impact) return;
+  const height = impact ? impact.height : 144;
   const width = height * explosion.naturalWidth / explosion.naturalHeight;
   ctx.save();
-  ctx.translate(box.x + box.w / 2, box.y + box.h / 2);
+  ctx.translate(impact ? impact.x : box.x + box.w / 2, impact ? impact.y : box.y + box.h / 2);
   ctx.scale(fighter.facing < 0 ? -1 : 1, 1);
   ctx.drawImage(explosion, -width / 2, -height / 2, width, height);
   ctx.restore();
@@ -85,7 +90,7 @@ export function render(ctx, match) {
   }
   drawPrize(ctx, match); // falling prize (no-op when the match has none)
   // Draw attacks above both characters, so neither player's effect is hidden.
-  for (const id of [1, 2]) drawAttack(ctx, match.fighters[id]);
+  for (const id of [1, 2]) drawAttack(ctx, match.fighters[id], match.fighters[id === 1 ? 2 : 1]);
   drawEffects(ctx, match);
   drawHUD(ctx, match);
 
