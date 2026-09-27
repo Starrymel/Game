@@ -5,7 +5,7 @@
 <title>Composure</title>
 <style>
   html, body { margin: 0; color: #dfebff; font: 14px system-ui; }
-  html { min-height: 100%; background: #0b0d12; }
+  html { min-height: 100%; background: #ffeaaa url('./assets/backgrounds/character-pattern-light.png') center / cover no-repeat fixed; }
   body { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 12px; }
   #stage { width: min(960px, 100%); height: auto; flex-shrink: 0; }
   #bio-debug, #presage-panel { width: min(800px, 100%); box-sizing: border-box; background: #111c2e; padding: 16px; border: 1px solid #34445b; border-radius: 8px; }
@@ -15,7 +15,7 @@
   #bio-debug > summary { font-size: 16px; letter-spacing: 0.4px; }
   #presage-panel select { background: #1a2740; color: #dfebff; border: 1px solid #34445b; border-radius: 4px; padding: 6px 8px; margin: 8px 8px 8px 0; }
   #presage-panel p { font-size: 12px; color: #c7d6ea; }
-  .game-controls { max-width: 960px; text-align: center; font: 700 14px/1.7 "Lucida Console", "Courier New", monospace; color: #dfebff; }
+  .game-controls { background: #111c2e; padding: 10px 16px; border-radius: 12px; box-sizing: border-box; max-width: 960px; text-align: center; font: 700 14px/1.7 "Lucida Console", "Courier New", monospace; color: #dfebff; }
   summary { cursor: pointer; font-weight: bold; }
   #bio-sliders { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
   fieldset { flex: 1; min-width: 260px; border: 1px solid #34445b; }
