@@ -8,7 +8,7 @@
   html { min-height: 100%; background: #ffeaaa url('./assets/backgrounds/character-pattern-light.png') center / cover no-repeat fixed; }
   body { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 12px; }
   #stage { width: min(1440px, 100%); height: auto; flex-shrink: 0; }
-  #bio-debug, #presage-panel { width: min(800px, 100%); box-sizing: border-box; background: #111c2e; padding: 16px; border: 1px solid #34445b; border-radius: 8px; }
+  #bio-debug, #presage-panel, #face-lab, #blink-lab { width: min(800px, 100%); box-sizing: border-box; background: #111c2e; padding: 16px; border: 1px solid #34445b; border-radius: 8px; }
   #bio-debug { font-family: "Lucida Console", "Courier New", monospace; font-weight: 700; border-radius: 16px; line-height: 1.5; }
   #bio-debug button, #bio-debug input, #bio-debug output { font-family: inherit; font-weight: 700; }
   #bio-debug fieldset { border-radius: 12px; }
@@ -25,22 +25,24 @@
   button { padding: 8px 12px; background: #243e58; color: white; border: 1px solid #638bad; border-radius: 4px; cursor: pointer; }
   canvas { image-rendering: pixelated; box-shadow: 0 0 0 2px #333; }
   /* Warm, muted panels keep the character wallpaper visible without competing with it. */
-  #bio-debug, #presage-panel, .game-controls {
+  #bio-debug, #presage-panel, #face-lab, #blink-lab, .game-controls {
     background: #f5d0aa;
     color: #38251d;
     border: 1px solid #b87d50;
     box-shadow: 0 3px 10px rgba(67, 36, 16, 0.16);
   }
-  #bio-debug fieldset { background: #fbe1c6; border-color: #bd916b; }
+  #bio-debug fieldset, #face-lab fieldset, #blink-lab fieldset { background: #fbe1c6; border-color: #bd916b; }
   #presage-panel p { color: #51392a; }
   #presage-panel select {
     background: #fff0df; color: #38251d; border-color: #a77550;
   }
-  #bio-debug button, #presage-panel button {
+  #bio-debug button, #presage-panel button, #face-lab button, #blink-lab button, .game-controls button {
     background: #e9b787; color: #38251d; border-color: #a77550; font-weight: 700;
   }
-  #bio-debug button:hover, #presage-panel button:hover { background: #f1c79f; }
-  #bio-debug input { accent-color: #925125; }
+  #bio-debug button:hover, #presage-panel button:hover, #face-lab button:hover, #blink-lab button:hover, .game-controls button:hover { background: #f1c79f; }
+  #bio-debug input, #presage-panel input, #face-lab input, #blink-lab input, .game-controls input { accent-color: #925125; }
+  .game-controls button { font: inherit; }
+  #face-lab select, #blink-lab select { background: #fff0df; color: #38251d; border: 1px solid #a77550; border-radius: 4px; padding: 6px; }
 </style>
 </head>
 <body>

@@ -59,3 +59,18 @@ test('speed grows with the tilt: slow near the threshold, full at 2x', () => {
   assert.equal(fast, 1);
   assert.equal(c.update(headSample(lm())).speed, 0);
 });
+
+test('drift: slowly resting off-centre never triggers movement, a quick move still does', () => {
+  const c = calibrated({ drift: 0.05, tiltDeg: 10 });
+  let fired = false;
+  for (let deg = 0; deg <= 30; deg += 0.25) {                 // creep from 0 to 30 degrees over 120 frames
+    const r = c.update(headSample(lm({ roll: deg })));
+    fired = fired || r.left || r.right;
+  }
+  assert.equal(fired, false);
+  assert.equal(c.update(headSample(lm({ roll: 30 + 25 }))).left, true);   // then a sharp 25 degree move counts
+  const fixed = calibrated({ drift: 0, tiltDeg: 10 });
+  let firedFixed = false;
+  for (let deg = 0; deg <= 30; deg += 0.25) firedFixed = firedFixed || fixed.update(headSample(lm({ roll: deg }))).left;
+  assert.equal(firedFixed, true);                              // without drift the same slow creep does trigger
+});

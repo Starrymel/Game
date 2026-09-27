@@ -38,7 +38,7 @@ export function initInput() {
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 }
 
-const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, light: false, special: false };
+const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, light: false, lightNear: false, special: false };
 
 export function readInput(playerId) {
   const r = remote[playerId];
@@ -56,6 +56,7 @@ export function readInput(playerId) {
     up: on('up'),
     down: on('down'),
     light: on('light'),
+    lightNear: on('lightNear'), // "punch, but only if the opponent is within reach" (the host decides; see game.js)
     special: on('special'),
   };
 }

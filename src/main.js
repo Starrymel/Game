@@ -1,3 +1,4 @@
+import { initMusic } from './music.js';
 import './logging/logger.js'; // D: subscribe before round_start
 import './mechanics.config.js'; // B: biometric mechanics
 import { initInput } from './input.js';
@@ -11,7 +12,10 @@ import { initDebugPanel } from './ui/debugPanel.js';
 import { initPresagePanel } from './ui/presagePanel.js';
 import { initBlinkLab } from './ui/blinkLab.js';
 import { initFaceLab } from './ui/faceLab.js';
+import { initFaceOverlay } from './ui/faceOverlay.js';
+import { createFaceControl } from './face/faceControl.js';
 import { connectNet } from './net.js';
+import { setPrizeEnabled } from './prize.js';
 import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
 
 const canvas = document.getElementById('stage');
@@ -38,6 +42,10 @@ if (role === 'host' || role === 'guest') {
   connectNet({ relayUrl: relayUrlFor(location, params), asRole: role, myPlayer: player });
 }
 
+// Falling prize on by default; ?prize=0 turns it off. Only the host simulates it (the guest just draws it).
+setPrizeEnabled(params.get('prize') !== '0');
+
+initMusic();
 initInput();
 initBiometrics();
 // Commentary must subscribe before runLoop() so it hears the first round_start.
@@ -49,7 +57,15 @@ const bridgeWsUrl = bridgeUrlFor(location, params);
 // ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
 const res = Number(params.get('presageRes'));
 initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
-if (params.get('facelab')) initFaceLab({ player });
+// Face controls (MediaPipe, in this browser: no bridge, works on the hosted site and for the guest too).
+// They start automatically with a short calibration; ?face=0 turns them off, or use the chip at the bottom left.
+if (params.get('face') !== '0') {
+  const faceControl = createFaceControl({ player });
+  window.__faceControl = faceControl;
+  initFaceOverlay({ control: faceControl, player });
+  if (params.get('facelab')) initFaceLab({ player, control: faceControl });
+  if (faceControl.settings.enabled) faceControl.start();
+}
 if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
 
 const match = runLoop({

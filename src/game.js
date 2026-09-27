@@ -6,6 +6,7 @@ import { readInput } from './input.js';
 import {
   STAGE, PHYSICS, COMBAT, makeFighter, hurtbox, hitbox, overlaps,
 } from './fighter.js';
+import { createPrize, stepPrize, publicPrize } from './prize.js';
 import {
   isNetHost, isNetGuest, broadcastState, requestRestart, setStateHandler, setRestartHandler,
 } from './net.js';
@@ -17,12 +18,14 @@ const SNAPSHOT_MS = 250;
 const ROUND_SECONDS = 99;
 const MIN_SEPARATION = 46;
 const BLOCK_DAMAGE_REDUCTION = 0.7;
+export const NEAR_PUNCH_PX = 110; // 'punch when near' (face smile) only fires within this centre-to-centre distance
 
 export function createMatch() {
   const match = {
     round: 1,
     timeRemaining: ROUND_SECONDS,
     over: false,
+    prize: createPrize(),
     fighters: {
       1: makeFighter(1, STAGE.width * 0.3, 1),
       2: makeFighter(2, STAGE.width * 0.7, -1),
@@ -36,6 +39,7 @@ export function resetMatch(match) {
   match.round += 1;
   match.timeRemaining = ROUND_SECONDS;
   match.over = false;
+  match.prize = createPrize();
   match.fighters[1] = makeFighter(1, STAGE.width * 0.3, 1);
   match.fighters[2] = makeFighter(2, STAGE.width * 0.7, -1);
   bus.emit('round_start', { round: match.round, t: Date.now() });
@@ -190,7 +194,7 @@ function updateFighter(match, f, opponent, dtSeconds, t) {
   if (f.y === 0 && f.state !== 'block') {
     if (input.special && f.meter >= f.maxMeter) {
       startAttack(f, 'special');
-    } else if (input.light) {
+    } else if (input.light || (input.lightNear && Math.abs(f.x - opponent.x) <= NEAR_PUNCH_PX)) {
       startAttack(f, 'light');
     }
   }
@@ -216,6 +220,7 @@ export function stepMatch(match, dtSeconds, t) {
 
   updateFighter(match, match.fighters[1], match.fighters[2], dtSeconds, t);
   updateFighter(match, match.fighters[2], match.fighters[1], dtSeconds, t);
+  stepPrize(match, dtSeconds, { emit: (name, payload) => bus.emit(name, payload) }); // no-op unless enabled
 }
 
 export function buildSnapshot(match, t) {
@@ -245,6 +250,7 @@ export function buildNetState(match, t) {
   return {
     t, round: match.round, timeRemaining: match.timeRemaining, over: match.over,
     players: [p(1), p(2)],
+    prize: publicPrize(match.prize),
   };
 }
 
@@ -254,7 +260,7 @@ export function matchFromNetState(state) {
   const fighters = {};
   for (const p of state.players) fighters[p.id] = { ...p };
   return {
-    round: state.round, timeRemaining: state.timeRemaining, over: state.over, fighters,
+    round: state.round, timeRemaining: state.timeRemaining, over: state.over, fighters, prize: state.prize,
   };
 }
 

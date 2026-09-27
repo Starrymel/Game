@@ -8,6 +8,7 @@ export const DEFAULTS = {
   vertFrac: 0.30,   // vertical head shift, in eye-distances: up = jump, down = hide
   hysteresis: 0.7,  // once triggered, stay on until the value falls below threshold * this
   smooth: 1,        // 1 = raw; lower (e.g. 0.4) smooths camera jitter but adds a little lag
+  drift: 0,         // 0 = fixed neutral; e.g. 0.01 lets the neutral follow slow shifts (only while nothing is triggered)
   minSpeed: 0.25,   // walking speed (0..1) right when the tilt crosses the threshold; grows to 1 at 2x the threshold
 };
 
@@ -18,6 +19,7 @@ export function headSample(lm) {
   const eye = Math.hypot(dx, dy);
   if (!(eye > 1e-6)) return null;
   return {
+    eye,                                            // distance between the eyes (fraction of image width): how close you sit
     rollDeg: (Math.atan2(dy, dx) * 180) / Math.PI, // + = head tilted to the user's left
     x: nose.x / eye,                                // + = head moved to the user's left (image right)
     y: nose.y / eye,                                // + = head lower in the image
@@ -65,6 +67,11 @@ export function createHeadController(opts = {}) {
       on.up = decide(on.up, -dyv, o.vertFrac);
       on.down = decide(on.down, dyv, o.vertFrac);
       if (on.left && on.right) { on.left = on.right = false; }
+      // Slow drift: while no direction is active the neutral creeps toward where you are resting, so leaning
+      // back in your chair never walks the fighter; only quick, deliberate moves cross the thresholds.
+      if (o.drift > 0 && !on.left && !on.right && !on.up && !on.down) {
+        neutral.rollDeg += o.drift * roll; neutral.x += o.drift * dxv; neutral.y += o.drift * dyv;
+      }
       // Analog-ish speed for sideways movement: crosses threshold slowly, reaches full speed at 2x threshold.
       const speed = (on.left || on.right) ? Math.min(1, o.minSpeed + (1 - o.minSpeed) * (Math.abs(side) - sideThr) / sideThr) : 0;
       return { ...on, speed: Math.max(0, speed), values: { roll, lean: dxv, vert: dyv } };
