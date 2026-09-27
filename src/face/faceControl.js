@@ -33,7 +33,8 @@ export function createFaceControl({
   let startedAt = 0;
   let wasUp = false; // jump is edge-triggered: one jump per head-up gesture, not "hold to bounce forever"
   let headActive = false; // true while ANY head tilt (left/right/up/down) is active (see the browsUp suppression below)
-  const rest = { brows: [], smile: [] };   // face at rest, gathered while calibrating (for the personal thresholds)
+  const rest = { brows: [], smile: [] };   // face at rest (rolling last ~4 s), for the personal thresholds
+  let restOpen = false;                    // collecting the resting face: from the start until the first measure()
 
   function apply() {
     gestureOpts.blinkHoldMs = settings.blinkHoldMs;
@@ -95,7 +96,7 @@ export function createFaceControl({
 
   // While calibrating (neutral face), remember what eyebrows and smile read at rest.
   offs.push(bus.on('face_values', (m) => {
-    if (m.player !== player || status !== 'calibrating' || !m.scores) return;
+    if (m.player !== player || !restOpen || !m.scores) return;
     for (const k of Object.keys(rest)) { rest[k].push(KINDS[k](m.scores)); if (rest[k].length > 120) rest[k].shift(); }
   }));
   offs.push(bus.on('face_frame', (m) => {
@@ -107,8 +108,9 @@ export function createFaceControl({
 
   // Ask the person to push a gesture as far as they can for `ms`; sets that gesture's threshold from their own range.
   // Resolves { ok, baseline, peak, threshold }. ok=false means "too small to tell apart from rest" (settings unchanged).
-  function measure(kind, ms = 2000) {
+  function measure(kind, ms = 2000, { shouldApply = () => true } = {}) {
     const read = KINDS[kind];
+    restOpen = false;                          // freeze the resting face: from here on the person is moving on purpose
     return new Promise((resolve) => {
       const values = [];
       const off = bus.on('face_values', (m) => { if (m.player === player && m.scores) values.push(read(m.scores)); });
@@ -117,7 +119,7 @@ export function createFaceControl({
         const baseline = mean(rest[kind]) ?? 0;
         const peak = robustPeak(values);
         const threshold = thresholdFrom(baseline, peak);
-        if (threshold != null) update(kind === 'brows' ? { browsUp: threshold } : { smileUp: threshold });
+        if (threshold != null && shouldApply()) update(kind === 'brows' ? { browsUp: threshold } : { smileUp: threshold });
         resolve({ ok: threshold != null, baseline, peak, threshold });
       }, ms);
     });
@@ -141,7 +143,7 @@ export function createFaceControl({
       setStatus('error', e);
       return;
     }
-    rest.brows.length = 0; rest.smile.length = 0;
+    rest.brows.length = 0; rest.smile.length = 0; restOpen = true;
     lastFaceAt = 0; startedAt = now(); frame = { luma: null, fps: null, eye: null }; wasUp = false;
     head.recenter();
     setStatus('calibrating');
@@ -163,7 +165,7 @@ export function createFaceControl({
     get error() { return error; },
     get warnings() { return warnings; },
     start, stop, update, measure,
-    recenter: () => { head.recenter(); if (status === 'ready') { status = 'calibrating'; setStatus('calibrating'); } },
+    recenter: () => { head.recenter(); rest.brows.length = 0; rest.smile.length = 0; restOpen = true; if (status === 'ready') { status = 'calibrating'; setStatus('calibrating'); } },
     dispose: () => { clearInterval(timer); timer = null; offs.forEach((off) => off()); },
   };
 }
