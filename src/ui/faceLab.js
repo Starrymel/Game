@@ -6,8 +6,8 @@ import { GESTURES } from '../face/gestures.js';
 import { createHeadController } from '../face/headPose.js';
 
 const ACTIONS = { none: null, punch: ['light', 150], special: ['special', 150], block: ['down', 400], jump: ['up', 200] };
-const LABELS = { browLeft: 'Raise left eyebrow only', browRight: 'Raise right eyebrow only', blink: 'Long blink (both eyes)', winkLeft: 'Wink left eye', winkRight: 'Wink right eye', jawOpen: 'Mouth open', smile: 'Smile' };
-const DEFAULT_MAP = { browLeft: 'none', browRight: 'none', blink: 'none', winkLeft: 'none', winkRight: 'none', jawOpen: 'special', smile: 'punch' };
+const LABELS = { smirkRight: 'Smirk: one mouth corner (right)', smirkLeft: 'Smirk: one mouth corner (left)', browLeft: 'Raise left eyebrow only', browRight: 'Raise right eyebrow only', blink: 'Long blink (both eyes)', winkLeft: 'Wink left eye', winkRight: 'Wink right eye', jawOpen: 'Mouth open', smile: 'Smile' };
+const DEFAULT_MAP = { smirkRight: 'punch', smirkLeft: 'punch', browLeft: 'none', browRight: 'none', blink: 'punch', winkLeft: 'none', winkRight: 'none', jawOpen: 'special', smile: 'none' };
 
 export function actionFor(map, gesture) { return ACTIONS[map[gesture]] ?? null; }
 
@@ -21,8 +21,10 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
     <p id="fl-status">Click Start. Needs internet (loads MediaPipe and the face model).</p>
     <button type="button" id="fl-start">Start face tracking</button>
     <button type="button" id="fl-stop">Stop</button>
-    <p id="fl-values">Eyes L/R: - | Mouth open: - | Smile: -</p>
+    <p id="fl-values">Eyes L/R: - | Mouth open: - | Mouth corners: -</p>
     <p id="fl-last"></p>
+    <p><label>Smirk sensitivity: corner must reach <b id="fl-smirk-v">0.22</b> <input type="range" id="fl-smirk" min="0.08" max="0.6" step="0.01" value="0.22"></label> (lower = easier)</p>
+    <p><label>Long blink = eyes closed for <b id="fl-hold-v">250</b> ms <input type="range" id="fl-hold" min="150" max="600" step="10" value="250"></label> (normal blinks are ~100-150 ms)</p>
     <fieldset id="fl-head"><legend>Head controls</legend>
       <label><input type="checkbox" id="fl-head-on" checked> On</label>
       Move sideways by: <select id="fl-head-mode"><option value="tilt">tilting head (ear to shoulder)</option><option value="lean">leaning head sideways</option></select>
@@ -37,10 +39,13 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
   document.body.append(panel);
   const $ = (s) => panel.querySelector(s);
   const counts = {};
+  const gestureOpts = { blinkHoldMs: 250, smirkUp: 0.22 }; // shared with the detector: changes apply live
+  $('#fl-smirk').oninput = (e) => { gestureOpts.smirkUp = Number(e.target.value); $('#fl-smirk-v').textContent = e.target.value; };
+  $('#fl-hold').oninput = (e) => { gestureOpts.blinkHoldMs = Number(e.target.value); $('#fl-hold-v').textContent = e.target.value; };
   panel.querySelectorAll('select').forEach((sel) => { sel.onchange = () => { map_[sel.dataset.g] = sel.value; }; });
 
   $('#fl-start').onclick = async () => {
-    try { await startFaceTracking({ player, onStatus: (t) => { $('#fl-status').textContent = t; } }); }
+    try { await startFaceTracking({ player, opts: gestureOpts, onStatus: (t) => { $('#fl-status').textContent = t; } }); }
     catch (e) { $('#fl-status').textContent = `Couldn't start: ${e?.message || e?.name || e}`; }
   };
   $('#fl-stop').onclick = () => { stopFaceTracking(); $('#fl-status').textContent = 'Stopped.'; };
@@ -68,7 +73,7 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
     lastPaint = Date.now();
     const s = m.scores;
     $('#fl-values').textContent = s
-      ? `Brows up L/R: ${(s.browOuterUpLeft ?? 0).toFixed(2)} / ${(s.browOuterUpRight ?? 0).toFixed(2)} | Eyes closed L/R: ${(s.eyeBlinkLeft ?? 0).toFixed(2)} / ${(s.eyeBlinkRight ?? 0).toFixed(2)} | Mouth open: ${(s.jawOpen ?? 0).toFixed(2)} | Smile: ${(((s.mouthSmileLeft ?? 0) + (s.mouthSmileRight ?? 0)) / 2).toFixed(2)}`
+      ? `Brows up L/R: ${(s.browOuterUpLeft ?? 0).toFixed(2)} / ${(s.browOuterUpRight ?? 0).toFixed(2)} | Eyes closed L/R: ${(s.eyeBlinkLeft ?? 0).toFixed(2)} / ${(s.eyeBlinkRight ?? 0).toFixed(2)} | Mouth open: ${(s.jawOpen ?? 0).toFixed(2)} | Mouth corners up L/R: ${(s.mouthSmileLeft ?? 0).toFixed(2)} / ${(s.mouthSmileRight ?? 0).toFixed(2)}`
       : 'No face in view';
   });
   bus.on('gesture', (g) => {

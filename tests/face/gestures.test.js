@@ -41,3 +41,27 @@ test('single eyebrow raise fires; both brows up does not', () => {
   assert.deepEqual(run(d2, [[0, { browOuterUpLeft: 0.8, browOuterUpRight: 0.8 }], [200, { browOuterUpLeft: 0.8, browOuterUpRight: 0.8 }]]), []);
   assert.equal(actionFor({ browRight: 'punch' }, 'browRight')[0], 'light');
 });
+
+test('long-blink hold time can be changed live through the options object', () => {
+  const opts = { blinkHoldMs: 250 };
+  const d = createGestureDetector(opts);
+  assert.deepEqual(run(d, [[0, closed], [200, closed], [260, {}]]).map((x) => x[1]), []);      // 200 ms < 250: no
+  opts.blinkHoldMs = 150;
+  assert.deepEqual(run(d, [[1000, closed], [1200, closed]]).map((x) => x[1]), ['blink']);      // 200 ms >= 150: yes
+});
+
+test('one-sided smirk fires for that side only; a full smile is not a smirk', () => {
+  const d = createGestureDetector();
+  const f = run(d, [[0, { mouthSmileRight: 0.7, mouthSmileLeft: 0.05 }], [100, { mouthSmileRight: 0.7, mouthSmileLeft: 0.05 }]]);
+  assert.deepEqual(f.map((x) => x[1]), ['smirkRight']);
+  const d2 = createGestureDetector();
+  assert.deepEqual(run(d2, [[0, { mouthSmileRight: 0.8, mouthSmileLeft: 0.8 }], [400, { mouthSmileRight: 0.8, mouthSmileLeft: 0.8 }]]).map((x) => x[1]), ['smile']);
+});
+
+test('a small real-world smirk (0.29 vs 0.14) fires; a symmetric small smile does not', () => {
+  const d = createGestureDetector();
+  const f = run(d, [[0, { mouthSmileRight: 0.29, mouthSmileLeft: 0.14 }], [100, { mouthSmileRight: 0.29, mouthSmileLeft: 0.14 }]]);
+  assert.deepEqual(f.map((x) => x[1]), ['smirkRight']);
+  const d2 = createGestureDetector();
+  assert.deepEqual(run(d2, [[0, { mouthSmileRight: 0.3, mouthSmileLeft: 0.28 }], [200, { mouthSmileRight: 0.3, mouthSmileLeft: 0.28 }]]).map((x) => x[1]), []);
+});
