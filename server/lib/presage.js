@@ -78,6 +78,38 @@ function defaultSdkFactory({ apiKey, requestedMetrics }) {
   return sdk;
 }
 
+// Best-effort: the installed platform package's own directory (e.g.
+// node_modules/@smartspectra/node-sdk-linux-x64), mirroring the vendor's own (internal, not
+// exported) resolution in resolve-native.js. That directory is also where its
+// smartspectra_manifest.json lives, declaring "resource_root_dir": "." -- a relative path the
+// native library must resolve *somehow*. If it resolves "." against the process's cwd rather
+// than its own package directory, that alone would explain "unable to resolve configured model
+// path" on a server (cwd = the app's own root) without touching local dev (cwd habits differ).
+// Returns null on any failure (unsupported platform, corrupt install) so callers can fail open.
+function resolvePlatformPackageDir() {
+  try {
+    const { name } = require('@smartspectra/node-sdk/package.json');
+    const pkg = `${name}-${process.platform}-${process.arch}`;
+    return require('path').dirname(require.resolve(`${pkg}/package.json`));
+  } catch (_) {
+    return null;
+  }
+}
+
+// Runs fn() with process.cwd() temporarily set to `dir` (a no-op if dir is null), always
+// restoring the real cwd afterward -- even on throw -- since this is a shared server process and
+// nothing else in it should ever observe a changed working directory.
+function withCwd(dir, fn) {
+  if (!dir) return fn();
+  const prev = process.cwd();
+  try {
+    process.chdir(dir);
+    return fn();
+  } finally {
+    process.chdir(prev);
+  }
+}
+
 function randomId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -134,7 +166,9 @@ function attachPresage(server, {
       const { breathingMetrics, cardioMetrics } = metrics();
       try {
         sdk = sdkFactory({ apiKey, requestedMetrics: [...breathingMetrics, ...cardioMetrics] });
-        sdk.start(); // throws synchronously on auth/setup failure, not just an 'error' event
+        // See resolvePlatformPackageDir()'s comment: a hypothesis-driven, fully-reversible attempt
+        // at a "configuration failed" / "unable to resolve configured model path" failure.
+        withCwd(resolvePlatformPackageDir(), () => sdk.start()); // throws synchronously on auth/setup failure, not just an 'error' event
       } catch (err) {
         failed = true; sdk = null;
         log(`[presage] player ${player}: session failed to start: ${err.message}`);
