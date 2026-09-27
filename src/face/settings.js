@@ -1,6 +1,6 @@
 // Face-control settings, remembered per browser. Everything is validated on load, so a corrupted or
 // hand-edited entry can never break the game; storage failures (private window, blocked) are ignored.
-import { DEFAULT_MAP, ACTIONS } from './actions.js';
+import { DEFAULT_MAP, ACTIONS, MAP_VERSION } from './actions.js';
 
 export const SETTINGS_KEY = 'composure.face.v3';
 export const DEFAULT_SETTINGS = {
@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   personalDone: false,  // the start screen has measured this person's eyebrows and smile
   blinkHoldMs: 250,     // long-blink duration
   map: DEFAULT_MAP,
+  mapVersion: MAP_VERSION,
 };
 export const RANGES = {
   headSens: [0.6, 2], maxSpeed: [0.2, 1], browsUp: [0.1, 0.85], smirkUp: [0.08, 0.6], smileUp: [0.1, 0.85], blinkHoldMs: [150, 600],
@@ -33,7 +34,7 @@ export function sanitizeSettings(raw) {
     const v = Number(raw[k]);
     if (raw[k] != null && Number.isFinite(v)) out[k] = clamp(v, range);
   }
-  if (raw.map && typeof raw.map === 'object') {
+  if (raw.mapVersion === MAP_VERSION && raw.map && typeof raw.map === 'object') {
     for (const g of Object.keys(DEFAULT_MAP)) {
       if (typeof raw.map[g] === 'string' && Object.hasOwn(ACTIONS, raw.map[g])) out.map[g] = raw.map[g];
     }

@@ -1,8 +1,8 @@
 const keys = new Set();
 
 const BINDINGS = {
-  1: { left: 'a', right: 'd', up: 'w', down: 's', light: 'f', special: 'g' },
-  2: { left: 'arrowleft', right: 'arrowright', up: 'arrowup', down: 'arrowdown', light: 'k', special: 'l' },
+  1: { left: 'a', right: 'd', up: 'w', down: 's', light: 'f', special: 'g', laser: 'h' },
+  2: { left: 'arrowleft', right: 'arrowright', up: 'arrowup', down: 'arrowdown', light: 'k', special: 'l', laser: 'j' },
 };
 
 // Two-laptop play (see src/net.js): the host substitutes the guest's actual
@@ -38,7 +38,7 @@ export function initInput() {
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 }
 
-const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, light: false, lightNear: false, special: false };
+const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, light: false, lightNear: false, special: false, laser: false };
 
 export function readInput(playerId) {
   const r = remote[playerId];
@@ -58,6 +58,7 @@ export function readInput(playerId) {
     light: on('light'),
     lightNear: on('lightNear'), // "punch, but only if the opponent is within reach" (the host decides; see game.js)
     special: on('special'),
+    laser: on('laser'),
   };
 }
 

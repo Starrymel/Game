@@ -56,7 +56,7 @@ function startAttack(f, kind) {
 }
 
 function resolveHit(match, attacker, defender, kind, t) {
-  const baseDamage = kind === 'special' ? COMBAT.specialDamage : COMBAT.lightDamage;
+  const baseDamage = kind === 'special' ? COMBAT.specialDamage : kind === 'laser' ? COMBAT.laserDamage : COMBAT.lightDamage;
   let dmg = Mechanics.calcDamage(baseDamage, attacker, defender);
 
   const blocking = defender.state === 'block';
@@ -138,8 +138,9 @@ function updateFighter(match, f, opponent, dtSeconds, t) {
 
   if (f.attack) {
     f.attack.elapsedMs += dtSeconds * 1000;
-    const activeMs = f.attack.kind === 'special' ? COMBAT.specialActiveMs : COMBAT.lightActiveMs;
-    const recoverMs = f.attack.kind === 'special' ? COMBAT.specialRecoverMs : COMBAT.lightRecoverMs;
+    const k = f.attack.kind;
+    const activeMs = k === 'special' ? COMBAT.specialActiveMs : k === 'laser' ? COMBAT.laserActiveMs : COMBAT.lightActiveMs;
+    const recoverMs = k === 'special' ? COMBAT.specialRecoverMs : k === 'laser' ? COMBAT.laserRecoverMs : COMBAT.lightRecoverMs;
 
     if (f.attack.phase === 'active') {
       if (!f.attack.hasHit) {
@@ -194,6 +195,8 @@ function updateFighter(match, f, opponent, dtSeconds, t) {
   if (f.y === 0 && f.state !== 'block') {
     if (input.special && f.meter >= f.maxMeter) {
       startAttack(f, 'special');
+    } else if (input.laser) {
+      startAttack(f, 'laser');                    // the eyebrow laser: regular ranged attack, no meter needed
     } else if (input.light || (input.lightNear && Math.abs(f.x - opponent.x) <= NEAR_PUNCH_PX)) {
       startAttack(f, 'light');
     }

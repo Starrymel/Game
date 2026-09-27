@@ -39,7 +39,7 @@ export function eyePositions(f) {
 // Where the special's hitbox is for this attack (hitbox() in fighter.js only returns it
 // during the active phase; the beam also needs it while fading out).
 function specialBox(f) {
-  const range = COMBAT.specialRange, h = 24;
+  const range = f.attack?.kind === 'laser' ? COMBAT.laserRange : COMBAT.specialRange, h = 24;
   const cx = f.x + f.facing * (COMBAT.bodyWidth / 2 + range / 2);
   const cy = STAGE.groundY - f.y - COMBAT.bodyHeight * 0.55;
   return { x: cx - range / 2, y: cy - h / 2, w: range, h };
@@ -49,8 +49,8 @@ function specialBox(f) {
 // opponent, and 0..1 opacity for this frame.
 export function beamGeometry(attacker, defender) {
   const a = attacker.attack;
-  if (!a || a.kind !== 'special') return null;
-  const active = COMBAT.specialActiveMs;
+  if (!a || (a.kind !== 'special' && a.kind !== 'laser')) return null;
+  const active = a.kind === 'laser' ? COMBAT.laserActiveMs : COMBAT.specialActiveMs;
   if (a.elapsedMs > active + BEAM_FADE_MS) return null;
   const box = specialBox(attacker);
   const target = hurtbox(defender);
@@ -60,7 +60,7 @@ export function beamGeometry(attacker, defender) {
     : { x: attacker.facing > 0 ? box.x + box.w : box.x, y: box.y + box.h / 2 };
   const grow = Math.min(1, a.elapsedMs / 40);                                  // quick charge-in
   const fade = a.elapsedMs <= active ? 1 : 1 - (a.elapsedMs - active) / BEAM_FADE_MS;
-  return { eyes: eyePositions(attacker), end, onTarget, alpha: Math.max(0, grow * fade), color: (EYES[attacker.id] ?? EYES[1]).color };
+  return { eyes: eyePositions(attacker), end, onTarget, alpha: Math.max(0, grow * fade), scale: a.kind === 'laser' ? 0.6 : 1, color: (EYES[attacker.id] ?? EYES[1]).color };
 }
 
 function drawBeam(ctx, beam, now) {
@@ -71,7 +71,7 @@ function drawBeam(ctx, beam, now) {
   for (const eye of beam.eyes) {
     ctx.globalAlpha = 0.45 * beam.alpha;
     ctx.strokeStyle = beam.color; ctx.shadowColor = beam.color; ctx.shadowBlur = 16;
-    ctx.lineWidth = 11 * wobble;
+    ctx.lineWidth = 11 * wobble * (beam.scale ?? 1);
     ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(beam.end.x, beam.end.y); ctx.stroke();
     ctx.globalAlpha = beam.alpha;
     ctx.strokeStyle = '#fff6e0'; ctx.shadowBlur = 6; ctx.lineWidth = 3;

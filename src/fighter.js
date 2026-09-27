@@ -10,7 +10,11 @@ export const COMBAT = {
   lightDamage: 8,
   specialDamage: 25,
   lightRange: 55,
-  specialRange: 65,
+  laserDamage: 9,         // regular ranged attack (eyebrows): weaker than the special, but always available
+  laserRange: 320,
+  laserActiveMs: 120,
+  laserRecoverMs: 450,    // long enough that it can't be spammed
+  specialRange: 320,      // the eye laser: mid-range (was 65 when the special was a close-up move); the beam in ui/effects.js follows this
   lightActiveMs: 100,
   lightRecoverMs: 200,
   specialActiveMs: 150,
@@ -48,7 +52,7 @@ export function hurtbox(f) {
 
 export function hitbox(f) {
   if (!f.attack || f.attack.phase !== 'active') return null;
-  const range = f.attack.kind === 'special' ? COMBAT.specialRange : COMBAT.lightRange;
+  const range = f.attack.kind === 'special' ? COMBAT.specialRange : f.attack.kind === 'laser' ? COMBAT.laserRange : COMBAT.lightRange;
   const w = range, h = 24;
   const cx = f.x + f.facing * (COMBAT.bodyWidth / 2 + range / 2);
   const cy = STAGE.groundY - f.y - COMBAT.bodyHeight * 0.55;
