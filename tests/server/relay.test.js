@@ -7,14 +7,19 @@ const { attachRelay, cleanRoom } = require('../../server/lib/relay');
 
 async function start() {
   const server = http.createServer();
-  const relay = attachRelay(server);
+  const relay = attachRelay(server, { heartbeatMs: 60000 });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   const open = (query) => new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/netplay?${query}`);
-    ws.received = [];
+    ws.received = [];      // game messages only
+    ws.peers = [];         // the relay's own {"type":"peer"} presence messages
     ws.closeInfo = null;
-    ws.on('message', (data, isBinary) => ws.received.push({ text: data.toString(), isBinary }));
+    ws.on('message', (data, isBinary) => {
+      const text = data.toString();
+      if (!isBinary && text.startsWith('{"type":"peer"')) ws.peers.push(JSON.parse(text).present);
+      else ws.received.push({ text, isBinary });
+    });
     ws.on('close', (code) => { ws.closeInfo = code; });
     ws.on('open', () => resolve(ws));
     ws.on('error', reject);
@@ -66,15 +71,56 @@ test('a connection without a valid role is refused', async () => {
   await stop();
 });
 
-test('a second host replaces the first one', async () => {
+test('a seat that is already taken is refused; the person already there is not kicked out', async () => {
   const { open, stop } = await start();
-  const first = await open('role=host'), second = await open('role=host');
+  const first = await open('role=host&room=t'), second = await open('role=host&room=t');
   await wait();
-  assert.equal(first.closeInfo, 4000);
-  const guest = await open('role=guest');
+  assert.equal(second.closeInfo, 4001);           // the newcomer is told "role taken"
+  assert.equal(first.closeInfo, null);            // the first one is still connected
+  const guest = await open('role=guest&room=t');
   guest.send('to-host');
   await wait();
-  assert.equal(second.received[0].text, 'to-host');
+  assert.equal(first.received[0].text, 'to-host');
+  await stop();
+});
+
+test('after the first person leaves, the seat is free again (reload / rejoin)', async () => {
+  const { open, stop } = await start();
+  const first = await open('role=host&room=r');
+  first.close();
+  await wait(150);
+  const again = await open('role=host&room=r');
+  await wait();
+  assert.equal(again.closeInfo, null);
+  await stop();
+});
+
+test('presence: each seat is told when the other is filled or emptied, and once on connect', async () => {
+  const { open, stop } = await start();
+  const host = await open('role=host&room=p');
+  await wait();
+  assert.deepEqual(host.peers, [false]);                  // alone in the room
+  const guest = await open('role=guest&room=p');
+  await wait();
+  assert.deepEqual(guest.peers, [true]);                  // host was already there
+  assert.deepEqual(host.peers, [false, true]);            // host learns the guest arrived
+  guest.close();
+  await wait(150);
+  assert.deepEqual(host.peers, [false, true, false]);     // and that the guest left
+  await stop();
+});
+
+test('room status for the lobby', async () => {
+  const { open, relay, stop } = await start();
+  assert.deepEqual(relay.status('nobody'), { host: false, guest: false });
+  const host = await open('role=host&room=lobby1');
+  await wait();
+  assert.deepEqual(relay.status('lobby1'), { host: true, guest: false });
+  const guest = await open('role=guest&room=lobby1');
+  await wait();
+  assert.deepEqual(relay.status('lobby1'), { host: true, guest: true });
+  assert.deepEqual(relay.status('lobby-other'), { host: false, guest: false });   // rooms are looked up by exact name only
+  host.close(); guest.close();
   await stop();
 });
 
@@ -93,4 +139,23 @@ test('room names are cleaned', () => {
   assert.equal(cleanRoom(''), 'default');
   assert.equal(cleanRoom(null), 'default');
   assert.equal(cleanRoom('x'.repeat(100)).length, 40);
+});
+
+test('a connection that stops answering heartbeats is dropped, freeing its seat', async () => {
+  const server = http.createServer();
+  const relay = attachRelay(server, { heartbeatMs: 60 });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const ghost = new WebSocket(`ws://127.0.0.1:${port}/netplay?role=host&room=ghost`, { autoPong: false }); // a laptop whose Wi-Fi died
+  await new Promise((r) => ghost.on('open', r));
+  ghost.on('error', () => {});
+  assert.equal(relay.status('ghost').host, true);
+  await wait(400);
+  assert.equal(relay.status('ghost').host, false);        // seat is free again
+  const again = new WebSocket(`ws://127.0.0.1:${port}/netplay?role=host&room=ghost`);
+  let closed = null; again.on('close', (c) => { closed = c; }); again.on('error', () => {});
+  await new Promise((r) => again.on('open', r));
+  await wait(100);
+  assert.equal(closed, null);                              // and someone new can sit there
+  relay.wss.clients.forEach((c) => c.terminate()); await new Promise((r) => server.close(r));
 });

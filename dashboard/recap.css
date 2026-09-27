@@ -1,15 +1,15 @@
-/* Owner: D. Compact recap styles. Dark only: it is shown over the game, which is dark. */
+/* Owner: D. Compact recap styles. Pastel pink with high-contrast text and player traces. */
 :root {
-  color-scheme: dark;
-  --bg: #0b0d12;
-  --panel: #1c1f2b;
-  --line: #2c3040;
-  --grid: #262a38;
-  --text: #f4f5f8;
-  --text-2: #b6b9c6;
-  --text-3: #8a8ea0;
-  --p1: #4a9eff;   /* matches the P1 fighter in the game */
-  --p2: #ff5f5f;   /* matches the P2 fighter in the game */
+  color-scheme: light;
+  --bg: #fce0e9;
+  --panel: #fff0f5;
+  --line: #ba8095;
+  --grid: #cda4b2;
+  --text: #42271f;
+  --text-2: #604032;
+  --text-3: #704b3e;
+  --p1: #1465b8;   /* matches the P1 fighter in the game */
+  --p2: #c42c43;   /* matches the P2 fighter in the game */
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
@@ -49,8 +49,9 @@ header { text-align: center; margin-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) { .summary.waiting { animation: none; } }
 
 .actions { text-align: center; }
-.btn { display: inline-block; padding: 10px 20px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel);
-  color: var(--text); text-decoration: none; font: 600 14px var(--mono); letter-spacing: .04em; }
-.btn:hover, .btn:focus-visible { border-color: var(--text-2); outline: none; }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 9px; border: 1px solid var(--line); background: #a92e64;
+  color: #fff; text-decoration: none; font: 600 14px var(--mono); letter-spacing: .04em; }
+.btn:hover { background: #89234f; }
+.btn:focus-visible { outline: 3px solid #42271f; outline-offset: 3px; }
 
 @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } .tile .v { font-size: 22px; } }

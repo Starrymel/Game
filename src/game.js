@@ -8,7 +8,7 @@ import {
 } from './fighter.js';
 import { createPrize, stepPrize, publicPrize } from './prize.js';
 import {
-  isNetHost, isNetGuest, broadcastState, requestRestart, setStateHandler, setRestartHandler,
+  isNetHost, isNetGuest, isNetWaiting, broadcastState, requestRestart, setStateHandler, setRestartHandler,
 } from './net.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -296,6 +296,8 @@ export function runLoop({ onSnapshot, onRender } = {}) {
     physicsAccMs += frameMs;
     snapshotAccMs += frameMs;
 
+    // Online, the host holds the match still until Player 2 is in the room (so the clock doesn't run on an empty seat).
+    if (isNetWaiting()) physicsAccMs = 0;
     while (physicsAccMs >= STEP_MS) {
       stepMatch(match, STEP_MS / 1000, Date.now());
       physicsAccMs -= STEP_MS;
