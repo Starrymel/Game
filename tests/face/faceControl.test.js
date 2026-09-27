@@ -72,7 +72,7 @@ test('gestures follow the saved map; other players are ignored', async () => {
 
 test('the laser is suppressed while ANY head tilt is active, since tilting nudges the eyebrow score too', async () => {
   const fc = mk(); await fc.start(); feed(1, {}, 40);
-  for (const spec of [{ roll: 40 }, { roll: -40 }, { cy: 0.35 }]) {   // left, right, up
+  for (const spec of [{ roll: 40 }, { roll: -40 }, { cy: 0.35 }, { cy: 0.65 }]) {   // left, right, up, down
     feed(1, spec, 8);
     bus.emit('gesture', { player: 1, name: 'browsUp' });
     assert.equal(readInput(1).laser, false, JSON.stringify(spec));   // suppressed: the tilt itself, not a deliberate raise

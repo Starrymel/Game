@@ -37,10 +37,18 @@ test('vertical: head up = jump, head down = hide; neutral does nothing', () => {
 
 test('a tilt-up that also carries incidental roll only jumps, not walks', () => {
   const c = calibrated();
-  const r = c.update(headSample(lm({ roll: 14, cy: 0.4 })));   // crosses both the left and up thresholds at once
+  const r = c.update(headSample(lm({ roll: 14, cy: 0.4 })));   // vertical excess (1.67x) beats side excess (1.4x)
   assert.equal(r.up, true);
   assert.equal(r.left, false);
   assert.equal(r.right, false);
+});
+
+test('a strong side tilt that only grazes the vertical threshold still walks, not jumps', () => {
+  const c = calibrated();
+  const r = c.update(headSample(lm({ roll: 35, cy: 0.4 })));   // side excess (3.5x) beats vertical excess (1.67x)
+  assert.equal(r.left, true);
+  assert.equal(r.up, false);
+  assert.equal(r.down, false);
 });
 
 test('lean mode uses sideways head movement; recenter re-calibrates', () => {
