@@ -49,7 +49,7 @@ const CSS = `
 #lobby p{margin:8px 0;color:#604032}
 #lobby .options{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
 @media (max-width:760px){#lobby .options{grid-template-columns:1fr}}
-#lobby .opt{font:inherit;color:#42271f;background:#fff0df;border:3px solid #b87d50;border-radius:18px;padding:30px 16px;min-height:170px;cursor:pointer;text-align:center}
+#lobby .opt{font:inherit;color:#42271f;background:#fff0df;border:3px solid #b87d50;border-radius:18px;padding:30px 16px;min-height:250px;cursor:pointer;text-align:center}
 #lobby .opt b{display:block;font-size:26px;margin-bottom:8px}
 #lobby .opt small{display:block;color:#704b3e;font-size:16px}
 #lobby .opt.p1{border-color:#2d5f9e}
@@ -59,21 +59,44 @@ const CSS = `
 #lobby .opt.taken small{color:#925125}
 #lobby .help{margin-top:22px;padding:14px 18px;background:#fff0df;border:1px solid #b87d50;border-radius:12px}
 #lobby .help b{color:#925125}
-#lobby .status{margin-top:12px;min-height:1.5em}
 #lobby .warn{color:#925125}
 #lobby .row{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
 #lobby .link{font:inherit;color:#604032;background:none;border:1px solid #b87d50;border-radius:10px;padding:8px 14px;cursor:pointer}
 #lobby .link:hover,#lobby .link:focus-visible{border-color:#925125;outline:none}
 #lobby .sr{position:absolute;left:-9999px}
 #lobby .opt{position:relative;overflow:hidden}
-#lobby .opt .prog{position:absolute;left:0;bottom:0;height:10px;width:0;background:#c96a1b}
-#lobby .tiny{font-size:13px;font-weight:400;opacity:.85}
+#lobby .opt > *:not(.prog){position:relative}
+#lobby .opt .prog{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(201,106,27,.38);box-shadow:inset -4px 0 0 #c96a1b}
+#lobby .opt .ico{display:block;margin:0 auto 6px}
+#lobby .opt .gest{display:block;font-size:26px;font-weight:800;color:#42271f;margin:2px 0 6px}
+#lobby .opt small{color:#42271f;font-size:16px}
+#lobby .cam{display:inline-flex;align-items:center;gap:6px;margin-left:14px;font-size:15px}
+#lobby .cam i{width:12px;height:12px;border-radius:50%;background:#a99;border:2px solid #42271f}
+#lobby .cam.on i{background:#3f9a3f}
+#lobby .count{display:inline-block;min-width:1.2em;text-align:center;font-size:52px;line-height:1;color:#925125;vertical-align:-6px}
+#lobby .lead{margin:2px 0 10px;font-size:18px}
+#lobby .status{margin:0 0 14px;min-height:1.4em;padding:12px 18px;font-size:28px;line-height:1.25;font-weight:800;background:#fff0df;border:3px dashed #b87d50;border-radius:14px;color:#42271f}
+#lobby .status.live{background:#f5d0aa;border:3px solid #925125}
+#lobby .options.locked .opt{opacity:.5;filter:saturate(.6)}
+#lobby .options.live .opt:not(:disabled){animation:lobbyglow 1.8s ease-in-out infinite}
+@keyframes lobbyglow{0%,100%{box-shadow:0 0 0 0 rgba(146,81,37,0)}50%{box-shadow:0 0 0 6px rgba(146,81,37,.25)}}
+@media (prefers-reduced-motion:reduce){#lobby .options.live .opt{animation:none}}
+#lobby .tiny{font-size:15px;font-weight:600;opacity:1;color:#604032;margin-top:14px}
 `;
 
 const LABELS = {
-  p1: { title: "I'm Player 1", note: 'starts the match - SMILE' },
-  p2: { title: "I'm Player 2", note: 'joins Player 1 - RAISE EYEBROWS' },
-  local: { title: 'This laptop only', note: 'two players, one screen' },
+  p1: { title: "I'm Player 1", gest: 'Smile', note: 'starts the match' },
+  p2: { title: "I'm Player 2", gest: 'Raise eyebrows', note: 'joins Player 1' },
+  local: { title: 'This laptop only', gest: 'Click or Enter', note: 'two players, one screen' },
+};
+// Hand-drawn icons in the page's own colours (thick brown outline, warm fill), so they read from across a desk.
+const INK = '#42271f', SKIN = '#ffd9a0';
+const svg = (inner) => `<svg class="ico" viewBox="0 0 100 100" width="84" height="84" aria-hidden="true" focusable="false" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+const face = `<circle cx="50" cy="52" r="38" fill="${SKIN}"/>`;
+export const ICONS = {
+  p1: svg(`${face}<circle cx="37" cy="44" r="4.5" fill="${INK}" stroke="none"/><circle cx="63" cy="44" r="4.5" fill="${INK}" stroke="none"/><path d="M27 60 Q50 88 73 60" stroke-width="6"/><path d="M24 55 L29 58 M76 55 L71 58" stroke-width="3.5"/>`),
+  p2: svg(`${face}<path d="M24 30 Q35 12 47 26" stroke-width="6"/><path d="M53 26 Q65 12 76 30" stroke-width="6"/><circle cx="37" cy="48" r="4.5" fill="${INK}" stroke="none"/><circle cx="63" cy="48" r="4.5" fill="${INK}" stroke="none"/><path d="M41 72 H59"/>`),
+  local: svg(`<rect x="16" y="24" width="68" height="46" rx="6" fill="${SKIN}"/><path d="M8 78 H92"/><circle cx="37" cy="39" r="6"/><circle cx="63" cy="39" r="6"/><path d="M27 62 Q37 48 47 62 M53 62 Q63 48 73 62" stroke-width="4"/>`),
 };
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) { return {}; } }
@@ -86,15 +109,12 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   const remembered = load();
   el.innerHTML = `<div class="card" role="dialog" aria-label="Start">
     <h1>Composure</h1>
-    <p>Play a friend online: one of you is Player 1, the other Player 2. Or play on this laptop.</p>
-    <div class="options" role="listbox" aria-label="Who are you?">
-      ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><b>${LABELS[id].title}</b><small data-note="${id}">${LABELS[id].note}</small><span class="prog" data-prog="${id}"></span></button>`).join('')}
-    </div>
-    <div class="help" id="lobby-help">
-      <p><b>Face:</b> <b>smile</b> and hold it to be Player 1. <b>Raise your eyebrows</b> and hold them to be Player 2. Keep it up until the bar fills.</p>
-      <p><b>Keyboard:</b> Left / Right to move, Enter to choose. <b>Mouse:</b> click.</p>
-    </div>
+    <p class="lead">Play a friend online, or on this laptop. <span class="cam" id="lobby-cam" hidden><i></i><span></span></span></p>
     <p class="status" id="lobby-face" aria-live="polite"></p>
+    <div class="options" id="lobby-options" role="listbox" aria-label="Who are you?">
+      ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><span class="prog" data-prog="${id}"></span>${ICONS[id]}<b>${LABELS[id].title}</b><span class="gest">${LABELS[id].gest}</span><small data-note="${id}">${LABELS[id].note}</small></button>`).join('')}
+    </div>
+    <p class="tiny" id="lobby-help">Face: hold the gesture until the card fills. Keyboard: Left / Right, then Enter. Mouse: click.</p>
     <p class="sr" id="lobby-announce" aria-live="assertive"></p>
     <div class="row"><button type="button" class="link" id="lobby-facetoggle"></button></div>
   </div>`;
@@ -109,6 +129,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   let closed = false;
   let readyAt = 0;           // when the camera became ready (0 = not ready)
   let selectSince = 0;       // when the current eyebrow/smile hold began
+  let lastFace = 0;          // last time the camera reported a face
   let baseReady = false;     // the resting position has been measured (face input counts from then on)
 
   function setFocus(i, announce = true) {
@@ -173,13 +194,13 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     if (!faceControl) return 'Face controls are off. Use the keyboard or the mouse.';
     const w = faceControl.warnings?.[0]?.text;
     switch (faceControl.status) {
-      case 'loading': return 'Starting face controls... allow the camera when asked.';
-      case 'calibrating': return `Sit comfortably and look at the screen for a moment...${w ? ' ' + w : ''}`;
+      case 'loading': return 'Starting the camera... allow it when asked.';
+      case 'calibrating': return `Sit comfortably and look at the screen...${w ? ' ' + w : ''}`;
       case 'ready': {
         if (w) return w;
         const left = readyAt ? Math.ceil((PACE.warmupMs - (now() - readyAt)) / 1000) : 0;
-        if (left <= 0 && !baseReady) return 'Relax your face for a moment...';
-        return left > 0 ? (left <= 1 ? 'Relax your face for a moment...' : `Starting in ${left}... (sit comfortably, relaxed face)`) : 'Ready! Smile for Player 1, or raise your eyebrows for Player 2 (hold it until the bar fills).';
+        if (left <= 0 && !baseReady) return 'Relax your face... almost there';
+        return left > 0 ? (left <= 1 ? 'Relax your face... almost there' : `Starting in ${left}... sit comfortably, relaxed face`) : 'Go! Smile = Player 1 · Raise eyebrows = Player 2';
       }
       case 'error': return `Face controls did not start (${faceControl.error?.message || 'camera problem'}). You can still use the keyboard or the mouse.`;
       default: return 'Face controls are off. Use the keyboard or the mouse.';
@@ -187,14 +208,26 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   }
   function paintFace() {
     const s = $('#lobby-face');
-    s.textContent = faceStatusText();
+    const txt = faceStatusText();
+    const cd = /^Starting in (\d+)\.\.\. (.*)$/.exec(txt);
+    if (cd) { s.textContent = ''; s.append('Starting in '); const n = document.createElement('span'); n.className = 'count'; n.textContent = cd[1]; s.append(n, `... ${cd[2]}`); }
+    else s.textContent = txt;
+    const cam = $('#lobby-cam');
+    cam.hidden = !faceControl || !['calibrating', 'ready'].includes(faceControl.status);
+    const seen = now() - lastFace < 1000;
+    cam.classList.toggle('on', seen); cam.lastChild.textContent = seen ? 'camera sees you' : 'camera cannot see you - face the screen';
     s.classList.toggle('warn', !!faceControl?.warnings?.length || faceControl?.status === 'error');
+    const live = !!faceControl && faceControl.status === 'ready' && baseReady && !faceControl.warnings?.length;
+    const locked = !!faceControl && ['loading', 'calibrating', 'ready'].includes(faceControl.status) && !live;
+    s.classList.toggle('live', live);
+    const opts = $('#lobby-options'); opts.classList.toggle('live', live); opts.classList.toggle('locked', locked);
     const t = $('#lobby-facetoggle');
     t.hidden = !faceControl;
     t.textContent = faceControl && (faceControl.status === 'off') ? 'Turn face controls on' : 'Turn face controls off';
   }
   if (faceControl) {
     offs.push(bus.on('face_status', paintFace), bus.on('face_warnings', paintFace));
+    offs.push(bus.on('face_values', (m) => { if (m.player === 1 && m.scores) lastFace = now(); }));
     // Nothing counts until the camera has been ready for a while (time to read this page and settle).
     const warmedUp = () => readyAt > 0 && now() - readyAt >= PACE.warmupMs;
     offs.push(bus.on('face_status', () => { readyAt = faceControl.status === 'ready' ? (readyAt || now()) : 0; }));
