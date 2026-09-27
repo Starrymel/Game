@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.window = globalThis.window || { addEventListener() {} };
-const { createHazard, stepHazard, setHazardEnabled, publicHazard, HAZARD, swordBox } = await import('../../src/hazard.js');
+const { createHazard, stepHazard, setHazardEnabled, publicHazard, HAZARD, swordBox, swordHits } = await import('../../src/hazard.js');
 const { makeFighter, hurtbox } = await import('../../src/fighter.js');
 const { createMatch, stepMatch, buildNetState, matchFromNetState } = await import('../../src/game.js');
 const { pickSwordArt } = await import('../../src/ui/hazardRender.js');
@@ -36,7 +36,7 @@ test('warns first (no damage), then falls, sticks in the floor, vanishes, and sc
   run(m, HAZARD.warnS - 0.2, h);
   assert.equal(m.hazard.phase, 'warn');
   assert.equal(h.log.hurt.length, 0, 'the marker itself never hurts');
-  m.fighters[1].x = 100;                       // step out
+  m.fighters[1].x = x > 400 ? x - (HAZARD.hitRadius + 60) : x + (HAZARD.hitRadius + 60);   // step out of the danger lane
   run(m, 0.4, h);
   assert.equal(m.hazard.phase, 'fall');
   run(m, 1.0, h);
@@ -125,4 +125,32 @@ test('sword art: any file that exists is used, otherwise the plain drawn sword',
   assert.equal(pickSwordArt(1, [null, null, null]), null);
   const ok = { complete: true, naturalWidth: 10 };
   assert.equal(pickSwordArt(2, [ok, null, null]), ok);
+});
+
+test('the danger zone is the red marker: inside it you are hit, outside its edge you are safe', () => {
+  const sword = { x: 400, yh: 0 };
+  const fighter = (x, y = 0) => ({ x, y });
+  assert.equal(swordHits(sword, fighter(400)), true);
+  assert.equal(swordHits(sword, fighter(400 + HAZARD.hitRadius - 1)), true, 'inside the lane, even far from the sword centre');
+  assert.equal(swordHits(sword, fighter(400 - HAZARD.hitRadius + 1)), true);
+  assert.equal(swordHits(sword, fighter(400 + HAZARD.hitRadius + 8)), false, 'past the marker edge: safe');
+  assert.equal(swordHits({ x: 400, yh: 300 }, fighter(400)), false, 'still high in the sky: the tip is far above the fighter');
+  assert.equal(swordHits({ x: 400, yh: 0 }, fighter(400, 200)), false, 'a fighter high in a jump passes over the tip');
+  assert.equal(swordHits({ x: 400, yh: 60 }, fighter(400)), true, 'the blade reaches the fighter while falling');
+});
+
+test('standing still always gets you hit; you have to move (aim error is smaller than the danger lane)', () => {
+  assert.ok(HAZARD.aimJitter < HAZARD.hitRadius);
+  setHazardEnabled(true);
+  for (const r of [0, 0.001, 0.25, 0.5, 0.75, 0.999, 1]) {
+    const m = mk(); m.fighters[2].state = 'ko'; m.fighters[1].x = 300; const h = hookSet(); h.random = rnd(r);
+    run(m, HAZARD.firstDelayS + 0.1, h);
+    run(m, HAZARD.warnS + 1.5, h);
+    assert.equal(h.log.hurt.length, 1, `random=${r}: the idle fighter was hit`);
+  }
+  setHazardEnabled(false);
+});
+
+test('walking out of the marker during the warning (about 1 s, 220 px/s) is always enough to be safe', () => {
+  assert.ok(220 * HAZARD.warnS > HAZARD.hitRadius + HAZARD.aimJitter + 20);
 });

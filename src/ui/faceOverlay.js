@@ -41,7 +41,7 @@ const CSS = `
 export const SKIP_HOLD_MS = 1000;     // the tilt must be held this long: a twitch or a stretch never skips
 export const SKIP_HINT = 'Tip: tilt your head slowly to the right to skip this step.';
 
-export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdownMs = 10000, holdMs = 3000, comfortMs = 10000, comfortReturningMs = 3000, now = () => Date.now() }) {
+export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdownMs = 10000, holdMs = 3000, comfortMs = 10000, comfortReturningMs = 10000, now = () => Date.now() }) {
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
 
   const overlay = document.createElement('div');

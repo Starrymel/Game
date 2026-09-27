@@ -5,9 +5,17 @@
 // Picking reloads the page into the right role. Everyone shares one room for now (see lobbyConfig.js).
 import { bus } from '../eventBus.js';
 import { joinSearch, localSearch, OPTIONS, optionEnabled, moveFocus, initialFocus } from '../lobbyConfig.js';
+import { KINDS } from '../face/personalCal.js';
 
 const KEY = 'composure.lobby.v2';
-const CONFIRM_AFTER_MS = 800;   // a highlight must stay put this long before a gesture can pick it (no accidental picks while moving)
+// Face pace on this screen: slow and steady, nothing happens by accident.
+export const LOBBY_PACE = {
+  warmupMs: 5000,       // after the camera is ready, wait this long before any face input counts (time to read and settle)
+  moveHoldMs: 700,      // a head tilt must be HELD this long to move the highlight one step
+  moveCooldownMs: 1200, // and after a move, wait this long before the next one
+  settleMs: 2000,       // the highlight must have stayed put this long before a choice can start
+  selectHoldMs: 1500,   // eyebrows (or a smile) must be HELD this long to choose; a bar fills on the card meanwhile
+};
 const CSS = `
 #lobby{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#ffeaaa;color:#42271f;font:600 18px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:16px;overflow:auto}
 #lobby .card{width:min(980px,100%)}
@@ -31,6 +39,9 @@ const CSS = `
 #lobby .link{font:inherit;color:#604032;background:none;border:1px solid #b87d50;border-radius:10px;padding:8px 14px;cursor:pointer}
 #lobby .link:hover,#lobby .link:focus-visible{border-color:#925125;outline:none}
 #lobby .sr{position:absolute;left:-9999px}
+#lobby .opt{position:relative;overflow:hidden}
+#lobby .opt .prog{position:absolute;left:0;bottom:0;height:10px;width:0;background:#c96a1b}
+#lobby .tiny{font-size:13px;font-weight:400;opacity:.85}
 `;
 
 const LABELS = {
@@ -42,7 +53,8 @@ const LABELS = {
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) { return {}; } }
 function save(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) { /* private window: fine */ } }
 
-export function initLobby({ pollMs = 2000, go = (search) => { location.search = search; }, faceControl = null, now = () => Date.now() } = {}) {
+export function initLobby({ pollMs = 2000, go = (search) => { location.search = search; }, faceControl = null, now = () => Date.now(), pace = {} } = {}) {
+  const PACE = { ...LOBBY_PACE, ...pace };
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
   const el = document.createElement('div'); el.id = 'lobby';
   const remembered = load();
@@ -50,10 +62,10 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     <h1>Composure</h1>
     <p>Play a friend online: one of you is Player 1, the other Player 2. Or play on this laptop.</p>
     <div class="options" role="listbox" aria-label="Who are you?">
-      ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><b>${LABELS[id].title}</b><small data-note="${id}">${LABELS[id].note}</small></button>`).join('')}
+      ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><b>${LABELS[id].title}</b><small data-note="${id}">${LABELS[id].note}</small><span class="prog" data-prog="${id}"></span></button>`).join('')}
     </div>
     <div class="help" id="lobby-help">
-      <p><b>Face:</b> tilt your head left or right to move the highlight, then <b>raise your eyebrows</b> or <b>smile</b> to choose.</p>
+      <p><b>Face:</b> tilt your head <b>slowly</b> left or right and hold it a moment to move the highlight. To choose, <b>raise your eyebrows</b> or <b>smile</b> and hold it until the bar fills.</p>
       <p><b>Keyboard:</b> Left / Right to move, Enter to choose. <b>Mouse:</b> click.</p>
     </div>
     <p class="status" id="lobby-face" aria-live="polite"></p>
@@ -69,6 +81,9 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   let focusedAt = now();
   let prevDir = { left: false, right: false };
   let closed = false;
+  let readyAt = 0;           // when the camera became ready (0 = not ready)
+  let selectSince = 0;       // when the current eyebrow/smile hold began
+  let headTilted = false;    // any head tilt right now (a tilt shifts the face and could look like an eyebrow raise)
 
   function setFocus(i, announce = true) {
     if (i === focus && announce) return;
@@ -76,6 +91,12 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     paint();
     btn(OPTIONS[focus]).focus({ preventScroll: true });        // keeps keyboard and face in step
     if (announce) $('#lobby-announce').textContent = `${LABELS[OPTIONS[focus]].title}. Raise your eyebrows or press Enter to choose.`;
+  }
+
+  // Progress bar on the highlighted card while a choice is being held.
+  function setBar(kind, k) {
+    if (kind !== 'select') return;
+    OPTIONS.forEach((id, i) => { const b = $(`[data-prog="${id}"]`); if (b) b.style.width = i === focus ? `${Math.round(k * 100)}%` : '0'; });
   }
 
   function paint() {
@@ -128,7 +149,11 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     switch (faceControl.status) {
       case 'loading': return 'Starting face controls... allow the camera when asked.';
       case 'calibrating': return `Sit comfortably and look at the screen for a moment...${w ? ' ' + w : ''}`;
-      case 'ready': return w ? w : 'Face controls are ready.';
+      case 'ready': {
+        if (w) return w;
+        const left = readyAt ? Math.ceil((PACE.warmupMs - (now() - readyAt)) / 1000) : 0;
+        return left > 0 ? `Face controls start in ${left}... (read the tips above)` : 'Face controls are ready. Tilt slowly and hold to move; hold your eyebrows up to choose.';
+      }
       case 'error': return `Face controls did not start (${faceControl.error?.message || 'camera problem'}). You can still use the keyboard or the mouse.`;
       default: return 'Face controls are off. Use the keyboard or the mouse.';
     }
@@ -143,20 +168,41 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   }
   if (faceControl) {
     offs.push(bus.on('face_status', paintFace), bus.on('face_warnings', paintFace));
-    // Head: one step per tilt (edge-triggered), so holding a tilt does not race through the options.
+    // Nothing counts until the camera has been ready for a while (time to read this page and settle).
+    const warmedUp = () => readyAt > 0 && now() - readyAt >= PACE.warmupMs;
+    offs.push(bus.on('face_status', () => { readyAt = faceControl.status === 'ready' ? (readyAt || now()) : 0; }));
+    if (faceControl.status === 'ready') readyAt = now();
+    const warmTimer = setInterval(() => { if (!closed) paintFace(); }, 250);
+    offs.push(() => clearInterval(warmTimer));
+
+    // Head: hold a tilt for moveHoldMs to move ONE step. After a step the head must come back to neutral, and there is a
+    // cooldown, so a wobble or a long tilt never races through the options.
+    let tiltDir = 0, tiltSince = 0, tiltArmed = false, lastMoveAt = 0;
     offs.push(bus.on('head_state', (m) => {
       if (m.player !== 1 || faceControl.status !== 'ready') return;
-      const s = m.state;
-      if (s.left && !prevDir.left) setFocus(moveFocus(focus, -1, status));
-      if (s.right && !prevDir.right) setFocus(moveFocus(focus, 1, status));
-      prevDir = { left: !!s.left, right: !!s.right };
+      const st = m.state, t = now();
+      headTilted = !!(st.left || st.right || st.up || st.down);
+      const dir = st.left ? -1 : st.right ? 1 : 0;
+      if (dir === 0) { tiltDir = 0; tiltSince = 0; tiltArmed = true; setBar('move', 0); return; }
+      if (!warmedUp() || !tiltArmed || t - lastMoveAt < PACE.moveCooldownMs) return;
+      if (dir !== tiltDir) { tiltDir = dir; tiltSince = t; }
+      if (t - tiltSince >= PACE.moveHoldMs) {
+        tiltArmed = false; lastMoveAt = t; tiltDir = 0;
+        setFocus(moveFocus(focus, dir, status));
+      }
     }));
-    // Eyebrows or a smile picks the highlighted option (only after it has stayed put a moment).
-    offs.push(bus.on('gesture', (g) => {
-      if (g.player !== 1 || faceControl.status !== 'ready') return;
-      if (g.name !== 'browsUp' && g.name !== 'smile') return;
-      if (now() - focusedAt < CONFIRM_AFTER_MS) return;
-      choose(OPTIONS[focus]);
+
+    // Choosing: eyebrows (or a smile) HELD for selectHoldMs, with the head still and the highlight settled. A bar on the card
+    // fills while you hold; letting go resets it.
+    offs.push(bus.on('face_values', (m) => {
+      if (m.player !== 1 || faceControl.status !== 'ready' || closed) return;
+      const t = now(), sc = m.scores;
+      const active = !!sc && !headTilted && (KINDS.brows(sc) > faceControl.settings.browsUp || KINDS.smile(sc) > faceControl.settings.smileUp);
+      if (!active || !warmedUp() || t - focusedAt < PACE.settleMs) { selectSince = 0; setBar('select', 0); return; }
+      if (!selectSince) selectSince = t;
+      const k = Math.min(1, (t - selectSince) / PACE.selectHoldMs);
+      setBar('select', k);
+      if (k >= 1) { selectSince = 0; choose(OPTIONS[focus]); }
     }));
     $('#lobby-facetoggle').addEventListener('click', () => { if (faceControl.status === 'off') faceControl.start(); else faceControl.stop(); });
     if (faceControl.settings.enabled) faceControl.start();

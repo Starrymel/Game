@@ -22,16 +22,16 @@ export function pickSwordArt(art, loaded = images) {
 function drawWarning(ctx, x, progress, now) {
   const y = STAGE.groundY + 8;
   const pulse = 0.55 + 0.45 * Math.sin(now / 70);
-  const grow = 0.7 + 0.3 * progress;
+  const grow = 1;                                                    // never smaller than the danger lane: what you see is what hurts
   ctx.save();
   ctx.globalAlpha = 0.10 + 0.14 * pulse * progress;
   ctx.fillStyle = '#ff3b3b';
-  ctx.fillRect(x - HAZARD.width / 2, 0, HAZARD.width, y);            // the column the sword will fall down
+  ctx.fillRect(x - HAZARD.hitRadius, 0, HAZARD.hitRadius * 2, y);   // the danger lane: standing anywhere in it gets you hit
   ctx.globalAlpha = 0.35 + 0.4 * pulse;
-  ctx.beginPath(); ctx.ellipse(x, y, 58 * grow, 16 * grow, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x, y, (HAZARD.hitRadius + 8) * grow, 16 * grow, 0, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 0.95;
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.ellipse(x, y, 58 * grow, 16 * grow, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x, y, (HAZARD.hitRadius + 8) * grow, 16 * grow, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.font = 'bold 40px monospace'; ctx.textAlign = 'center';
   ctx.lineWidth = 6; ctx.strokeStyle = '#7a0000'; ctx.fillStyle = '#fff';
   ctx.strokeText('!', x, y - 34); ctx.fillText('!', x, y - 34);

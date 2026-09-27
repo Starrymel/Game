@@ -109,6 +109,7 @@ function startGame() {
 
 if (needsLobby(params)) {
   // The start screen can be run with the face too (tilt to move, eyebrows or a smile to pick).
-  initLobby({ faceControl: params.get('face') !== '0' ? createFaceControl({ player: 1 }) : null });
+  // ?lobbyFast=1 speeds up the face pace on this screen (for testing only).
+  initLobby({ faceControl: params.get('face') !== '0' ? createFaceControl({ player: 1 }) : null, pace: params.get('lobbyFast') ? { warmupMs: 800, moveHoldMs: 250, moveCooldownMs: 300, settleMs: 500, selectHoldMs: 400 } : {} });
 }
 else startGame();

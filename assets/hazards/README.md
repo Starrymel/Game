@@ -9,3 +9,5 @@ Drop transparent PNGs here and the game picks one at random for each falling swo
 - Transparent background. One file is enough.
 - If there are no files, the game draws a simple sword instead.
 - To allow more than 3 designs, change `artSlots` in `src/hazard.js` and the file list in `src/ui/hazardRender.js`.
+
+Note: the sword's damage zone is a lane about 100 px wide (the red floor marker), not the width of the drawing, so the art can be any width.

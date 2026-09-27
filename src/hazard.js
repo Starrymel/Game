@@ -1,7 +1,7 @@
 // Falling swords: every few seconds a sword drops from the sky at a marked spot. Stay out of the spot (walk, jump or
 // block) or lose HP. Host-authoritative like the prize: the state lives on the match and rides along in the net state.
 // Off unless enabled (setHazardEnabled(true), see main.js).
-import { STAGE, hurtbox, overlaps } from './fighter.js';
+import { STAGE, COMBAT, hurtbox, overlaps } from './fighter.js';
 
 export const HAZARD = {
   firstDelayS: 10,        // first sword after the round starts
@@ -10,10 +10,12 @@ export const HAZARD = {
   fallSpeed: 560,         // px/sec
   stuckS: 0.55,           // stays embedded in the floor briefly (harmless) before vanishing
   spawnTipHeight: 430,    // tip height above the floor when it starts (whole sword is off-screen)
-  width: 30,              // collision width
-  length: 84,             // collision height (the blade)
+  width: 30,              // drawn width of the plain sword
+  length: 84,             // blade length (also the height of the danger zone)
+  hitRadius: 50,          // you are hit if your body centre is within this many px of the sword's line: the red marker on the floor
+                          // is drawn a little wider than this, so what looks dangerous IS dangerous, and its edge is safe
   damage: 12,
-  aimJitter: 90,          // swords are aimed at a fighter, +/- this many px, so you actually have to move
+  aimJitter: 45,          // aimed at a fighter, +/- this many px (less than hitRadius: standing still always gets you hit; you have to move)
   artSlots: 3,            // sword1.png .. sword3.png in assets/hazards/ (see the README there)
   margin: 60,
 };
@@ -30,6 +32,14 @@ export function createHazard() {
 export function publicHazard(h) {
   if (!h) return null;
   return { phase: h.phase, x: h.x, yh: h.yh, art: h.art, t: h.t, seq: h.seq, lastHit: h.lastHit };
+}
+
+// Does the falling sword hurt this fighter right now? Horizontal: inside the marker's danger lane (a fighter's drawn sprite is
+// much wider than the physics body, so a thin sword-sized box felt like "it hit me but did nothing"). Vertical: the blade
+// and the fighter's body overlap in height (a fighter high in a jump can pass over the tip).
+export function swordHits(h, f) {
+  if (Math.abs(h.x - f.x) > HAZARD.hitRadius) return false;
+  return h.yh <= f.y + COMBAT.bodyHeight && h.yh + HAZARD.length >= f.y;
 }
 
 // The sword's body, tip at the bottom: canvas coordinates, same space as hurtbox().
@@ -68,10 +78,9 @@ export function stepHazard(match, dt, { random = Math.random, emit = () => {}, h
 
   if (h.phase === 'fall') {
     h.yh = Math.max(0, h.yh - HAZARD.fallSpeed * dt);
-    const box = swordBox(h);
     for (const id of [1, 2]) {
       const f = match.fighters[id];
-      if (!f || f.state === 'ko' || h.hitIds.includes(id) || !overlaps(hurtbox(f), box)) continue;
+      if (!f || f.state === 'ko' || h.hitIds.includes(id) || !swordHits(h, f)) continue;
       h.hitIds.push(id);
       const dealt = hurt(f, HAZARD.damage);
       h.lastHit = { player: id, hp: Math.round(dealt), seq: h.seq };
