@@ -6,6 +6,7 @@
 import { setRemoteInput, readInput } from './input.js';
 import { bus } from './eventBus.js';
 import { isForwardableSample, acceptGuestSample } from './netconfig.js';
+import { acceptSourceFor } from './biometrics.js';
 
 const INPUT_SEND_HZ = 60;
 
@@ -47,7 +48,12 @@ export function connectNet({ relayUrl, asRole, myPlayer }) {
     } else if (msg.type === 'bio' && role === 'host') {
       // The guest's own camera readings (computed by the guest's local Presage bridge).
       const sample = acceptGuestSample(msg.sample, remotePlayer);
-      if (sample) bus.emit('biometric_sample', sample);
+      if (sample) {
+        // Real readings for the guest's player: use them instead of this laptop's mock data
+        // (sources are per player, so the host starting its own camera doesn't cover the guest).
+        acceptSourceFor(sample.player, 'presage');
+        bus.emit('biometric_sample', sample);
+      }
     }
   };
   socket.onerror = (e) => console.warn(`[net] ${role} socket error`, e);

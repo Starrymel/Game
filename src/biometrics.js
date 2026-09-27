@@ -34,6 +34,15 @@ export function getBiometricsSource(player) {
   return sourceFor[player];
 }
 
+// Accept one player's readings from `next` without opening any connection. Used by the
+// netplay host: the guest's camera readings arrive over the relay (not from this
+// laptop's bridge), and must not be filtered out as "not the selected source".
+export function acceptSourceFor(player, next) {
+  if (sourceFor[player] === next) return;
+  sourceFor[player] = next;
+  target[player] = null;
+}
+
 function lerp(cur, dest, dtSeconds) {
   const k = 1 - Math.exp(-dtSeconds / SMOOTH_TAU_SECONDS);
   return cur + (dest - cur) * k;
