@@ -1,6 +1,6 @@
 import { bus } from '../eventBus.js';
 import { mechanicsConfig } from '../mechanics.config.js';
-import { hurtbox } from '../fighter.js';
+import { hurtbox, overlaps, COMBAT, STAGE } from '../fighter.js';
 const flashes = {}, heals = {};
 bus.on('flinch', ({ player, magnitude }) => { flashes[player] = { at: performance.now(), magnitude }; });
 bus.on('heal_tick', ({ player, amount }) => { if (amount > 0) heals[player] = performance.now(); });
@@ -12,8 +12,87 @@ export function beginEffects(ctx) {
   const strength = Math.max(0, ...Object.values(flashes).map(f => f.magnitude * Math.max(0, 1 - (now - f.at) / c.flashMs)));
   if (!reduced()) ctx.translate(Math.sin(now * 0.09) * strength * c.shakePx, Math.cos(now * 0.07) * strength * c.shakePx);
 }
+// ---- Special: eye beam -------------------------------------------------------
+// Purely visual. Driven by the fighter's own attack state each frame (so it shows on
+// a whiff too; the 'special' bus event only fires when it connects), and it never
+// draws farther than the special can actually hit: it ends on the opponent only when
+// the special's real hitbox reaches them, otherwise it stops at its true reach.
+//
+// Eye anchors are fractions of each sprite's right-facing art (assets/characters),
+// placed with the same layout render.js uses in drawCharacter().
+const SPRITE_HEIGHT = 166, SPRITE_FOOT_OFFSET = 32; // must match drawCharacter() in render.js
+const EYES = {
+  1: { aspect: 1542 / 1760, color: '#ff3b3b', eyes: [[0.324, 0.40], [0.567, 0.393]] }, // dog: red sparkles
+  2: { aspect: 928 / 1410, color: '#ffa31a', eyes: [[0.21, 0.326], [0.447, 0.298]] },  // bunny: orange sparkles
+};
+const BEAM_FADE_MS = 200; // after the active window, while the attacker recovers
+
+export function eyePositions(f) {
+  const art = EYES[f.id] ?? EYES[1];
+  const w = SPRITE_HEIGHT * art.aspect;
+  return art.eyes.map(([u, v]) => ({
+    x: f.x + f.facing * (-w / 2 + u * w),
+    y: STAGE.groundY - f.y + SPRITE_FOOT_OFFSET - SPRITE_HEIGHT + v * SPRITE_HEIGHT,
+  }));
+}
+
+// Where the special's hitbox is for this attack (hitbox() in fighter.js only returns it
+// during the active phase; the beam also needs it while fading out).
+function specialBox(f) {
+  const range = COMBAT.specialRange, h = 24;
+  const cx = f.x + f.facing * (COMBAT.bodyWidth / 2 + range / 2);
+  const cy = STAGE.groundY - f.y - COMBAT.bodyHeight * 0.55;
+  return { x: cx - range / 2, y: cy - h / 2, w: range, h };
+}
+
+// null when no beam should be drawn; otherwise eyes -> end, whether it's on the
+// opponent, and 0..1 opacity for this frame.
+export function beamGeometry(attacker, defender) {
+  const a = attacker.attack;
+  if (!a || a.kind !== 'special') return null;
+  const active = COMBAT.specialActiveMs;
+  if (a.elapsedMs > active + BEAM_FADE_MS) return null;
+  const box = specialBox(attacker);
+  const target = hurtbox(defender);
+  const onTarget = a.hasHit || (defender.state !== 'ko' && overlaps(box, target));
+  const end = onTarget
+    ? { x: target.x + target.w / 2 - attacker.facing * target.w * 0.25, y: target.y + target.h * 0.4 }
+    : { x: attacker.facing > 0 ? box.x + box.w : box.x, y: box.y + box.h / 2 };
+  const grow = Math.min(1, a.elapsedMs / 40);                                  // quick charge-in
+  const fade = a.elapsedMs <= active ? 1 : 1 - (a.elapsedMs - active) / BEAM_FADE_MS;
+  return { eyes: eyePositions(attacker), end, onTarget, alpha: Math.max(0, grow * fade), color: (EYES[attacker.id] ?? EYES[1]).color };
+}
+
+function drawBeam(ctx, beam, now) {
+  const wobble = reduced() ? 1 : 1 + 0.18 * Math.sin(now * 0.06);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'lighter';
+  for (const eye of beam.eyes) {
+    ctx.globalAlpha = 0.45 * beam.alpha;
+    ctx.strokeStyle = beam.color; ctx.shadowColor = beam.color; ctx.shadowBlur = 16;
+    ctx.lineWidth = 11 * wobble;
+    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(beam.end.x, beam.end.y); ctx.stroke();
+    ctx.globalAlpha = beam.alpha;
+    ctx.strokeStyle = '#fff6e0'; ctx.shadowBlur = 6; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(beam.end.x, beam.end.y); ctx.stroke();
+    ctx.fillStyle = '#fff6e0';
+    ctx.beginPath(); ctx.arc(eye.x, eye.y, 4 * wobble, 0, Math.PI * 2); ctx.fill();   // eye flare
+  }
+  if (beam.onTarget) {                                                              // impact burst
+    ctx.globalAlpha = 0.8 * beam.alpha;
+    ctx.fillStyle = beam.color; ctx.shadowColor = beam.color; ctx.shadowBlur = 24;
+    ctx.beginPath(); ctx.arc(beam.end.x, beam.end.y, 14 * wobble, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
 export function drawEffects(ctx, match) {
   const now = performance.now(), c = mechanicsConfig.effects;
+  for (const [id, other] of [[1, 2], [2, 1]]) {
+    const beam = beamGeometry(match.fighters[id], match.fighters[other]);
+    if (beam) drawBeam(ctx, beam, now);
+  }
   for (const id of [1, 2]) {
     const box = hurtbox(match.fighters[id]), flash = flashes[id];
     if (flash && now - flash.at < c.flashMs) {
