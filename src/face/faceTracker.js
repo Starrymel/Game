@@ -4,6 +4,7 @@
 import { bus } from '../eventBus.js';
 import { createGestureDetector, scoreMap } from './gestures.js';
 import { headSample } from './headPose.js';
+import { lumaMean } from './warnings.js';
 
 const VERSION = '0.10.21';
 export const MP_BUNDLE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION}/vision_bundle.mjs`;
@@ -39,14 +40,23 @@ export async function startFaceTracking({ player, deviceId, opts, onStatus = () 
   await video.play();
 
   const detect = createGestureDetector(opts);
-  const state = { stop: false, lastVideoTime: -1, frames: 0 };
+  const state = { stop: false, lastVideoTime: -1, frames: 0, statFrames: 0, lastStat: performance.now() };
+  // Tiny canvas for measuring how bright the picture is (for the "too dark" warning).
+  const thumb = document.createElement('canvas'); thumb.width = 32; thumb.height = 24;
+  const thumbCtx = thumb.getContext('2d', { willReadFrequently: true });
   const loop = () => {
     if (state.stop) return;
     if (video.currentTime !== state.lastVideoTime && video.readyState >= 2) {
       state.lastVideoTime = video.currentTime;
       const now = performance.now();
       const res = landmarker.detectForVideo(video, now);
-      state.frames++;
+      state.frames++; state.statFrames++;
+      if (now - state.lastStat >= 500) {
+        let luma = null;
+        try { thumbCtx.drawImage(video, 0, 0, 32, 24); luma = lumaMean(thumbCtx.getImageData(0, 0, 32, 24).data); } catch (_) { /* unreadable frame */ }
+        bus.emit('face_frame', { player, fps: (state.statFrames * 1000) / (now - state.lastStat), luma, t: Date.now() });
+        state.statFrames = 0; state.lastStat = now;
+      }
       const cats = res?.faceBlendshapes?.[0]?.categories;
       if (cats) {
         const scores = scoreMap(cats);
