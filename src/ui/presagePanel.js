@@ -21,25 +21,12 @@ export function cameraErrorText(e) {
 
 // One line per player: what's actually happening, so "heart rate does nothing"
 // has a visible reason (bridge not running, no face, waiting for first reading).
-// Path alone tells local bridge/server.js (/biometrics) apart from a deployed site's own
-// same-origin endpoint (/presage) -- hostname doesn't (a same-Wifi guest reaches the local
-// bridge via the host's LAN IP, not literally "localhost").
-const isLocalBridge = (url) => /\/biometrics(\?|$)/.test(url);
-
 export function describePresage(player, { source, streaming, status, hr, now = Date.now() }) {
   if (source !== 'presage') return `Player ${player}: mock data (no camera)`;
-  if (!status.connected) {
-    return isLocalBridge(status.url)
-      ? `Player ${player}: can't reach the Presage bridge at ${status.url} -- is it running? (cd bridge && npm start)`
-      : `Player ${player}: can't reach Presage at ${status.url} -- retrying automatically`;
-  }
+  if (!status.connected) return `Player ${player}: can't reach the Presage bridge at ${status.url} -- is it running? (cd bridge && npm start)`;
   if (!streaming) return `Player ${player}: bridge connected, camera not started`;
   const last = status.lastSampleAt[player];
   const hint = status.lastHint[player];
-  const err = status.lastError?.[player];
-  // No real reading has ever arrived and the server told us why: say so plainly instead of an
-  // endless "waiting for first reading" that will never resolve (game still runs on mock/neutral values).
-  if (!last && err) return `Player ${player}: Presage unavailable (${err}) -- using neutral values`;
   if (!last) return `Player ${player}: waiting for first reading${hint ? ` -- ${hint}` : ' (keep your face in view and hold still ~10s)'}`;
   const age = Math.round((now - last) / 1000);
   if (now - last > STALE_MS) return `Player ${player}: no reading for ${age}s${hint ? ` -- ${hint}` : ''}`;

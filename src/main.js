@@ -63,8 +63,8 @@ function startGame() {
   // Commentary must subscribe before runLoop() so it hears the first round_start.
   window.__commentary = initCommentary({ bus });
 
-  // Where Presage vitals come from: the host laptop's local bridge when on the same Wi-Fi (?host=<address>),
-  // or the hosted site's own server (same origin, no local process needed) when the page is deployed. See netconfig.js.
+  // Where the Presage bridge is: on the host laptop when on the same Wi-Fi (?host=<address>), or on THIS laptop
+  // (localhost) when the page is the hosted https site. See netconfig.js.
   const bridgeWsUrl = bridgeUrlFor(location, params);
   // ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
   const res = Number(params.get('presageRes'));
@@ -90,10 +90,9 @@ function startGame() {
       });
     }
   }
-  // Presage: starts by itself (real heart rate from this laptop's camera) when reachable -- either the
-  // deployed server's own same-origin endpoint, or a local bridge/server.js -- ?presage=0 turns it off.
+  // Presage: starts by itself (real heart rate from this laptop's camera) when its bridge is running; ?presage=0 turns it off.
   if (params.get('presage') !== '0') {
-    initPresageChip({ player, wsUrl: bridgeWsUrl, capture: presageCapture, after: faceReady });
+    initPresageChip({ player, wsUrl: bridgeWsUrl, capture: presageCapture, needsCert: location.protocol === 'https:', after: faceReady });
   }
   if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
 

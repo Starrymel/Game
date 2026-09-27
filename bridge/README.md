@@ -1,16 +1,9 @@
-# Presage bridge (local dev)
+# Presage bridge
 
 Browser has no SmartSpectra SDK, so this tiny Node service is the real vitals
 extractor: it takes webcam frames over WebSocket and runs them through
 `@smartspectra/node-sdk` (on-device inference), then broadcasts decoded
 `{player, hr, breath, stress, calm}` back over the same connection.
-
-**On the deployed (Render) site you don't need this at all** — the same
-SmartSpectra logic runs inside the main server itself, same origin, at
-`/presage` (see `server/lib/presage.js`); `src/netconfig.js` picks that
-automatically for any non-localhost https page. This standalone bridge is
-still used for local development, i.e. whenever the page itself is
-`localhost`.
 
 ## Setup
 

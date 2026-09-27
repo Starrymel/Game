@@ -53,7 +53,3 @@ const server = app.listen(PORT, () => console.log(`[server] http://localhost:${P
 const relay = require('./lib/relay').attachRelay(server, { log: (m) => console.log(m) });
 // Lobby helper: who is sitting in a room right now? Exact room names only; nothing else is listed.
 app.get('/api/room/:name', (req, res) => res.json({ relay: true, ...relay.status(req.params.name) }));
-
-// Presage vitals, same-origin (wss://<site>/presage) -- no per-player local bridge process needed
-// on a deployed site. See server/lib/presage.js; bridge/ is still used for local dev.
-require('./lib/presage').attachPresage(server, { log: (m) => console.log(m) });

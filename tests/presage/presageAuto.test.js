@@ -25,7 +25,7 @@ test('probeBridge: true when something answers, false when refused or silent', a
 function rig(overrides = {}) {
   const log = { source: [], started: [], changes: [] };
   const auto = createPresageAuto({
-    player: 2, wsUrl: 'ws://localhost:8787/biometrics',
+    player: 2, wsUrl: 'ws://up',
     probe: async () => true,
     start: async (player, opts) => { log.started.push([player, opts.wsUrl]); return () => { log.stopped = true; }; },
     setSource: (kind, o) => log.source.push([kind, o.player]),
@@ -41,7 +41,7 @@ test('bridge running: switches this player to Presage and starts the camera feed
   await auto.start();
   assert.equal(auto.phase, 'live');
   assert.deepEqual(log.source, [['presage', 2]]);
-  assert.deepEqual(log.started, [[2, 'ws://localhost:8787/biometrics']]);
+  assert.deepEqual(log.started, [[2, 'ws://up']]);
   assert.deepEqual(log.changes, ['probing', 'live']);
 });
 
@@ -77,34 +77,6 @@ test('chip text: measuring, live reading, lost signal, certificate hint', () => 
   assert.match(presageChipText({ phase: 'live', lastSampleAt: 0, now }), /measuring.*10 seconds/);
   assert.equal(presageChipText({ phase: 'live', lastSampleAt: now - 1000, hr: 71.6, now }), 'Heart rate: 72 bpm (live)');
   assert.match(presageChipText({ phase: 'live', lastSampleAt: now - 9000, hr: 70, hint: 'No face found', now }), /lost the signal.*No face found/);
-  assert.match(presageChipText({ phase: 'no-bridge', wsUrl: 'wss://localhost:8790/biometrics' }), /https:\/\/localhost:8790/);
-  assert.match(presageChipText({ phase: 'no-bridge', wsUrl: 'ws://192.168.1.5:8787/biometrics' }), /not running on this laptop/);
-  // A deployed site's own same-origin /presage endpoint: no local process to start, different advice.
-  assert.match(presageChipText({ phase: 'no-bridge', wsUrl: 'wss://composure.onrender.com/presage' }), /Could not reach Presage on the server/);
-  // The camera connected fine, but the server-side session itself failed: this must be visible,
-  // not indistinguishable from a normal "still measuring" wait.
-  assert.match(
-    presageChipText({ phase: 'live', lastSampleAt: 0, serverError: 'no API key configured on the server', now }),
-    /unavailable \(no API key configured on the server\)/,
-  );
+  assert.match(presageChipText({ phase: 'no-bridge', needsCert: true }), /https:\/\/localhost:8790/);
   assert.equal(presageChipText({ phase: 'weird' }), '');
-});
-
-test('a server-side error is surfaced even though the camera connected fine (not silently swallowed)', async () => {
-  const { auto, log } = rig({ status: () => ({ lastSampleAt: { 2: 0 }, lastHint: {}, lastError: { 2: 'SmartSpectra session failed: no key' } }) });
-  await auto.start();
-  assert.equal(auto.phase, 'live');
-  assert.match(auto.text(), /unavailable \(SmartSpectra session failed: no key\)/);
-});
-
-test('restart() reconnects a live-but-broken session (plain retry() would no-op)', async () => {
-  const { auto, log } = rig();
-  await auto.start();
-  assert.equal(auto.phase, 'live');
-  await auto.retry();                    // no-op: phase is already 'live'
-  assert.equal(log.started.length, 1);
-  await auto.restart();                  // stop() then start() again: a real fresh connection
-  assert.equal(log.stopped, true);
-  assert.equal(log.started.length, 2);
-  assert.equal(auto.phase, 'live');
 });
