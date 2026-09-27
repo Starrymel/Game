@@ -104,11 +104,25 @@ is upload-and-poll (not live), and breathing confidence needs a 30s window, HRV 
 Treat real biometrics as a slow "vibe" signal (heal rate, meter gating band), not a per-hit
 reactive one — mock data stays the primary driver of the demo even after Presage is wired up.
 
-**The bridge is built** — see `bridge/` (Node service running `@smartspectra/node-sdk`,
-WebSocket in: raw webcam frames, WebSocket out: `{player, hr, breath, stress, calm, source}`
-matching the biometric-sample shape in #1) and `src/presage-capture.js` (browser webcam →
-bridge). Setup and usage: `bridge/README.md`. Not yet tested against a real API key/camera —
-budget time before the demo to verify the full pipeline, not just that it compiles.
+**Two ways to run it now:**
+
+- **Deployed site (Render): no local bridge needed.** `server/lib/presage.js` runs the
+  SmartSpectra Node SDK inside the main server itself, attached to the same HTTP server as
+  the game/API/relay, at `wss://<site>/presage`. `PRESAGE_API_KEY` is a server-side env var
+  (see `render.yaml`), never sent to the browser. One independent SDK session per WebSocket
+  connection; connections from the same page load are correlated via a `?session=` id (see
+  `src/presageSession.js`) so vitals never cross between two players or two unrelated matches
+  on the shared server. `src/netconfig.js#bridgeUrlFor` picks this automatically for any
+  non-localhost https page.
+- **Local dev: `bridge/`** (unchanged) — a standalone Node service, same message format,
+  still used when the page itself is `localhost` (see `bridge/README.md`).
+
+Both sides use the same message format: WebSocket in: raw webcam frames
+(`src/presage-capture.js`); WebSocket out: `{player, hr, breath, stress, calm, source}`
+matching the biometric-sample shape in #1. Confirmed working end to end against a real
+camera/key (see `bridge/README.md`'s notes); the in-server path is new and unit-tested
+(`tests/server/presage.test.js`) but not yet demo-verified against two real laptops — budget
+time before the demo to verify that, not just that it compiles.
 
 `src/biometrics.js` smooths whatever arrives (mock or Presage) into a continuous per-tick
 value via `advanceBiometricsSmoothing()`, so `getBiometrics()` always updates every physics

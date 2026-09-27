@@ -1,8 +1,9 @@
-// STUB — fill in once the Node/WebSocket bridge exists.
-// See CONTRACT.md #7: no browser SDK, so this connects to a local Node
-// process (running the SmartSpectra Node SDK) over WebSocket instead of
-// calling Presage directly from the browser.
+// Connects to wherever the Presage vitals are coming from: the deployed server's own
+// /presage endpoint, or a local bridge/server.js (see src/netconfig.js). Not the same
+// connection presage-capture.js uses to SEND frames -- see src/presageSession.js for how
+// the two are correlated server-side without ever mixing up two different players/matches.
 import { bus } from './eventBus.js';
+import { withSession } from './presageSession.js';
 
 const state = {
   1: { hr: null, breath: null, stress: 0, calm: 1, t: 0 },
@@ -17,11 +18,13 @@ let retryMs = 1500;
 let connected = false;
 const lastSampleAt = { 1: 0, 2: 0 };
 const lastHint = { 1: null, 2: null };
+const lastError = { 1: null, 2: null }; // sticky: e.g. "no API key configured on the server"
 
 // For the camera panel: is the bridge reachable, when did each player's last real
-// reading arrive, and what the SDK last said about the video ("No face found", ...).
+// reading arrive, what the SDK last said about the video ("No face found", ...), and
+// any hard error (missing key, session failed) so the game can explain a dead camera.
 export function getPresageStatus() {
-  return { connected, url: currentUrl, lastSampleAt: { ...lastSampleAt }, lastHint: { ...lastHint } };
+  return { connected, url: currentUrl, lastSampleAt: { ...lastSampleAt }, lastHint: { ...lastHint }, lastError: { ...lastError } };
 }
 
 function setConnected(next) {
@@ -45,7 +48,7 @@ function connect() {
   if (!wanted) return;
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
   try {
-    socket = new WebSocket(currentUrl);
+    socket = new WebSocket(withSession(currentUrl));
   } catch (e) {
     console.warn('[presage] failed to connect, retrying', e);
     scheduleRetry();
@@ -63,6 +66,7 @@ function connect() {
     // Bridge status updates (SDK validation hints, session errors) aren't readings.
     if (msg.type === 'status') {
       lastHint[msg.player] = msg.hint ?? null;
+      if (msg.error) lastError[msg.player] = msg.error; // sticky: stays visible until a real reading arrives
       bus.emit('presage_status', { player: msg.player, code: msg.code, hint: msg.hint, error: msg.error });
       return;
     }
@@ -70,6 +74,7 @@ function connect() {
     const { player, hr, breath, stress, calm } = msg; // expect { player, hr, breath, stress, calm }
     Object.assign(s, { hr, breath, stress, calm }, { t: Date.now() });
     lastSampleAt[player] = s.t;
+    lastError[player] = null; // a real reading arrived, so any earlier error no longer applies
     bus.emit('biometric_sample', { ...s, player, source: 'presage' });
   };
   // The bridge may not be running yet, or may be restarted mid-session: keep trying instead of giving up

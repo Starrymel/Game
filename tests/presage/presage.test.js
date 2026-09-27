@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PRESAGE_SESSION_ID } from '../../src/presageSession.js';
 
 // Browser globals the biometrics modules touch at import / connect time.
 const sockets = [];
@@ -55,7 +56,9 @@ test('presage client: listens on the bridge the frames go to, reconnecting when 
   assert.equal(presage.getPresageStatus().connected, true);
   presage.startPresageBiometrics('wss://localhost:8790/biometrics'); // e.g. hosted https page
   assert.equal(first.closed, true);
-  assert.equal(sockets.at(-1).url, 'wss://localhost:8790/biometrics');
+  // the actual socket carries ?session= (so the server can pair it with the frame-sending
+  // connection for the same player); the tracked url used for comparisons/display does not.
+  assert.equal(sockets.at(-1).url, `wss://localhost:8790/biometrics?session=${PRESAGE_SESSION_ID}`);
   assert.equal(presage.getPresageStatus().url, 'wss://localhost:8790/biometrics');
 });
 
@@ -83,17 +86,29 @@ test('presage client: status messages are not readings; bad messages are ignored
   offS(); offT();
 });
 
+test('presage client: a hard error is remembered until a real reading arrives', () => {
+  presage.startPresageBiometrics('ws://localhost:8787/biometrics');
+  const ws = sockets.at(-1);
+  ws.open();
+  ws.recv({ type: 'status', player: 1, error: 'no API key configured on the server' });
+  assert.equal(presage.getPresageStatus().lastError[1], 'no API key configured on the server');
+  ws.recv({ player: 1, hr: 70, breath: 13, stress: 0.2, calm: 0.8, source: 'presage', t: 1 });
+  assert.equal(presage.getPresageStatus().lastError[1], null, 'a real reading clears the earlier error');
+});
+
 test('camera panel explains every state in plain words', () => {
   const now = 100000;
-  const st = (over = {}) => ({ connected: true, url: 'ws://localhost:8787/biometrics', lastSampleAt: { 1: 0, 2: 0 }, lastHint: { 1: null, 2: null }, ...over });
+  const st = (over = {}) => ({ connected: true, url: 'ws://localhost:8787/biometrics', lastSampleAt: { 1: 0, 2: 0 }, lastHint: { 1: null, 2: null }, lastError: { 1: null, 2: null }, ...over });
   const d = (over, status) => panel.describePresage(1, { source: 'presage', streaming: true, status: st(status), hr: 71.6, now, ...over });
   assert.match(d({ source: 'mock' }), /mock data/);
   assert.match(d({}, { connected: false }), /can't reach the Presage bridge .* is it running\?/);
+  assert.match(d({}, { connected: false, url: 'wss://composure.onrender.com/presage' }), /can't reach Presage at wss:\/\/composure\.onrender\.com\/presage -- retrying automatically/);
   assert.match(d({ streaming: false }), /camera not started/);
   assert.match(d({}, {}), /waiting for first reading \(keep your face in view/);
   assert.match(d({}, { lastHint: { 1: 'No face found.' } }), /waiting for first reading -- No face found/);
   assert.equal(d({}, { lastSampleAt: { 1: now - 2000 } }), 'Player 1: 72 bpm from camera (updated 2s ago)');
   assert.match(d({}, { lastSampleAt: { 1: now - 9000 }, lastHint: { 1: 'Hold still.' } }), /no reading for 9s -- Hold still/);
+  assert.match(d({}, { lastError: { 1: 'no API key configured on the server' } }), /Presage unavailable \(no API key configured on the server\) -- using neutral values/);
 });
 
 test('camera errors are explained even when the browser gives no message', () => {

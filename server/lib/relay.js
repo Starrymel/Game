@@ -10,6 +10,7 @@
 // A seat that is already held by a live connection is refused with close code 4001 ("role taken"), so a
 // second person can never silently kick the first one out. Dead connections are dropped by a heartbeat.
 const { WebSocketServer } = require('ws');
+const { routeUpgrades } = require('./wsRouter');
 
 const MAX_ROOMS = 50;             // stops a stranger opening thousands of rooms on a public site
 const MAX_PAYLOAD = 512 * 1024;   // per message; a full game state is a few KB
@@ -20,7 +21,10 @@ const isOpen = (ws) => !!ws && ws.readyState === ws.OPEN;
 const sendJson = (ws, obj) => { if (isOpen(ws)) ws.send(JSON.stringify(obj)); };
 
 function attachRelay(server, { path = '/netplay', log = () => {}, heartbeatMs = HEARTBEAT_MS } = {}) {
-  const wss = new WebSocketServer({ server, path, maxPayload: MAX_PAYLOAD });
+  // noServer: true + a shared dispatcher (see wsRouter.js) -- ws's own `{ server, path }` convenience
+  // mode does not coexist safely with a second such instance on the same server (e.g. presage.js's).
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
+  routeUpgrades(server).set(path, wss);
   const rooms = new Map();        // name -> { host, guest }
 
   // Who is in a room right now (for the lobby's "Player 1 is taken" display). Only exact names are looked up.

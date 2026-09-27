@@ -1,16 +1,17 @@
-// Owner: D. Where the browser connects for two-player play and for the Presage bridge.
+// Owner: D. Where the browser connects for two-player play and for Presage vitals.
 // Pure functions (no DOM access) so they can be unit tested.
 //
-// Two setups are supported:
+// Three setups are supported:
 //  * Same Wi-Fi (page is http://): relay on the host laptop (port 8788, or ?relayPort=), and the host laptop's
-//    bridge on port 8787 -- the guest streams its camera to it (?host=<host address>).
-//  * Hosted site (page is https://, e.g. Render): the relay is the site itself at /netplay, and EVERY laptop
-//    runs its own bridge, reached at localhost. The camera video never leaves the laptop -- only the small
-//    heart-rate readings travel, through the relay. NOTE: every browser blocks plain ws:// from an https://
-//    page as mixed content, even to localhost (confirmed: Chromium #40386732, Firefox bug 1376309, reproduces
-//    in Safari) -- so the bridge also runs a wss:// listener with a self-signed cert on a separate port
-//    (see bridge/server.js). Visit https://localhost:<port> once per laptop and accept the certificate
-//    warning before this will connect.
+//    local bridge on port 8787 -- the guest streams its camera to it (?host=<host address>).
+//  * Hosted site (page is https://, e.g. Render): the relay is the site itself at /netplay, and Presage runs
+//    server-side too, same origin, at /presage (see server/lib/presage.js) -- no per-player local process needed.
+//  * Hosted site, but the page's own hostname IS localhost (local dev serving the game over https, or testing):
+//    keeps using a local bridge/server.js instead, over wss:// on its separate self-signed-cert port, since a
+//    plain ws:// connection from an https:// page is blocked as mixed content in every browser, even to
+//    localhost (confirmed: Chromium #40386732, Firefox bug 1376309, reproduces in Safari).
+
+const isLocalHost = (hostname) => hostname === 'localhost' || hostname === '127.0.0.1';
 
 export function relayUrlFor(loc, params) {
   const room = params.get('room');
@@ -25,10 +26,13 @@ export function bridgeUrlFor(loc, params) {
   const override = params.get('bridge');           // full address, e.g. ?bridge=ws://192.168.1.5:8787/biometrics
   if (override) return override;
   if (loc.protocol === 'https:') {
-    // Plain ws:// from an https page is blocked as mixed content in every
-    // browser, even to localhost -- see bridge/server.js's wss:// listener.
-    const wssPort = params.get('bridgeWssPort') || 8790;
-    return `wss://localhost:${wssPort}/biometrics`;
+    if (isLocalHost(loc.hostname)) {
+      // Local dev bridge (bridge/server.js) with its own self-signed-cert wss:// listener.
+      const wssPort = params.get('bridgeWssPort') || 8790;
+      return `wss://localhost:${wssPort}/biometrics`;
+    }
+    // Hosted site: Presage runs inside the same server, same origin -- no local bridge needed.
+    return `wss://${loc.host}/presage`;
   }
   const port = params.get('bridgePort') || 8787;
   return `ws://${params.get('host') || loc.hostname}:${port}/biometrics`;

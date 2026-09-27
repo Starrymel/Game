@@ -1,11 +1,14 @@
 // Browser side of the Presage bridge: grabs a player's webcam, downsamples
 // frames onto a hidden canvas, and streams raw RGBA over WebSocket to
-// bridge/server.js. Not auto-started (needs camera permission + a running
-// bridge + a real API key) — call startPresageCapture() explicitly, e.g.
-// from a debug panel button or the console.
+// either the deployed server's own /presage endpoint or a local bridge/server.js
+// (see src/netconfig.js). Not auto-started (needs camera permission + a real API
+// key configured somewhere) — call startPresageCapture() explicitly, e.g. from a
+// debug panel button or the console.
 //
 // Binary frame layout, little-endian:
 //   uint32 player | uint32 width | uint32 height | float64 timestampUs | RGBA bytes
+import { withSession } from './presageSession.js';
+
 const HEADER_BYTES = 20;
 
 export async function listCameraDevices() {
@@ -46,7 +49,7 @@ export async function startPresageCapture(player, {
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  const socket = new WebSocket(wsUrl);
+  const socket = new WebSocket(withSession(wsUrl));
   socket.binaryType = 'arraybuffer';
 
   function sendFrame() {
