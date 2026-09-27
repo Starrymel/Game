@@ -9,6 +9,7 @@ import { render } from './render.js';
 import { bus } from './eventBus.js';
 import { initCommentary } from './commentary/index.js';
 import { initDebugPanel } from './ui/debugPanel.js';
+import { initPresageChip } from './presageAuto.js';
 import { initPresagePanel } from './ui/presagePanel.js';
 import { initBlinkLab } from './ui/blinkLab.js';
 import { initFaceLab } from './ui/faceLab.js';
@@ -66,7 +67,11 @@ function startGame() {
   const bridgeWsUrl = bridgeUrlFor(location, params);
   // ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
   const res = Number(params.get('presageRes'));
-  initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
+  const presageCapture = res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {};
+  // ?debug=1 shows the developer panels (Presage camera setup, Biofeedback lab); players do not need them.
+  const debug = !!params.get('debug');
+  if (debug) initPresagePanel({ wsUrl: bridgeWsUrl, capture: presageCapture });
+  let faceReady = Promise.resolve();   // Presage waits for the face controls to grab the camera first (one permission prompt, no clash)
   // Face controls (MediaPipe, in this browser: no bridge, works on the hosted site and for the guest too).
   // They start automatically with a short calibration; ?face=0 turns them off, or use the chip at the bottom left.
   if (params.get('face') !== '0') {
@@ -76,7 +81,17 @@ function startGame() {
     const cal = Number(params.get('calCountdown'));
     initFaceOverlay({ control: faceControl, player, ...(cal > 0 ? { countdownMs: cal * 1000, comfortMs: cal * 1000, comfortReturningMs: cal * 1000, holdMs: Math.min(3, cal) * 1000 } : {}) });
     if (params.get('facelab')) initFaceLab({ player, control: faceControl });
-    if (faceControl.settings.enabled) faceControl.start();
+    if (faceControl.settings.enabled) {
+      faceControl.start();
+      faceReady = new Promise((resolve) => {
+        const off = bus.on('face_status', (st) => { if (st.player === player && st.status !== 'loading') { off(); resolve(); } });
+        setTimeout(() => { off(); resolve(); }, 8000);      // never wait forever
+      });
+    }
+  }
+  // Presage: starts by itself (real heart rate from this laptop's camera) when its bridge is running; ?presage=0 turns it off.
+  if (params.get('presage') !== '0') {
+    initPresageChip({ player, wsUrl: bridgeWsUrl, capture: presageCapture, needsCert: location.protocol === 'https:', after: faceReady });
   }
   if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
 
@@ -84,7 +99,7 @@ function startGame() {
     onRender: (match) => render(ctx, match),
   });
   window.__match = match; // debug/tests
-  if (match) initDebugPanel(match); // Only the host owns mutable game state.
+  if (match && debug) initDebugPanel(match); // Only the host owns mutable game state. Developer tool: ?debug=1
 
   // Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).
   window.addEventListener('keydown', (e) => {
@@ -110,6 +125,6 @@ function startGame() {
 if (needsLobby(params)) {
   // The start screen can be run with the face too (tilt to move, eyebrows or a smile to pick).
   // ?lobbyFast=1 speeds up the face pace on this screen (for testing only).
-  initLobby({ faceControl: params.get('face') !== '0' ? createFaceControl({ player: 1 }) : null, pace: params.get('lobbyFast') ? { warmupMs: 800, moveHoldMs: 200, repeatMs: 350, gapToleranceMs: 100, settleMs: 500, selectHoldMs: 400 } : {} });
+  initLobby({ faceControl: params.get('face') !== '0' ? createFaceControl({ player: 1 }) : null, pace: params.get('lobbyFast') ? { warmupMs: 800, baselineMs: 400, moveHoldMs: 200, repeatMs: 350, gapToleranceMs: 100, settleMs: 500, selectHoldMs: 400 } : {} });
 }
 else startGame();

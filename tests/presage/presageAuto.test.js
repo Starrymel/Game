@@ -1,0 +1,82 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+globalThis.window = globalThis.window || { addEventListener() {} };
+const { probeBridge, createPresageAuto, presageChipText } = await import('../../src/presageAuto.js');
+
+class FakeWS {                                   // opens, errors, or hangs depending on the address
+  constructor(url) {
+    this.url = url;
+    setTimeout(() => {
+      if (url.includes('up')) this.onopen?.();
+      else if (url.includes('refused')) { this.onerror?.(); this.onclose?.(); }
+    }, 5);
+  }
+  close() { this.closed = true; }
+}
+
+test('probeBridge: true when something answers, false when refused or silent', async () => {
+  assert.equal(await probeBridge('ws://up', { WS: FakeWS, timeoutMs: 200 }), true);
+  assert.equal(await probeBridge('ws://refused', { WS: FakeWS, timeoutMs: 200 }), false);
+  assert.equal(await probeBridge('ws://hang', { WS: FakeWS, timeoutMs: 50 }), false);          // never answers: gives up
+  assert.equal(await probeBridge('ws://x', { WS: class { constructor() { throw new Error('blocked'); } }, timeoutMs: 50 }), false);
+});
+
+function rig(overrides = {}) {
+  const log = { source: [], started: [], changes: [] };
+  const auto = createPresageAuto({
+    player: 2, wsUrl: 'ws://up',
+    probe: async () => true,
+    start: async (player, opts) => { log.started.push([player, opts.wsUrl]); return () => { log.stopped = true; }; },
+    setSource: (kind, o) => log.source.push([kind, o.player]),
+    status: () => ({ lastSampleAt: { 2: 0 }, lastHint: {} }),
+    onChange: (s) => log.changes.push(s.phase),
+    ...overrides,
+  });
+  return { auto, log };
+}
+
+test('bridge running: switches this player to Presage and starts the camera feed (no button needed)', async () => {
+  const { auto, log } = rig();
+  await auto.start();
+  assert.equal(auto.phase, 'live');
+  assert.deepEqual(log.source, [['presage', 2]]);
+  assert.deepEqual(log.started, [[2, 'ws://up']]);
+  assert.deepEqual(log.changes, ['probing', 'live']);
+});
+
+test('no bridge: stays on simulated data and says so; Retry works once the bridge is up', async () => {
+  let up = false;
+  const { auto, log } = rig({ probe: async () => up });
+  await auto.start();
+  assert.equal(auto.phase, 'no-bridge');
+  assert.deepEqual(log.source, [], 'nothing was switched');
+  assert.match(auto.text(), /simulated.*not running/i);
+  up = true;
+  await auto.retry();
+  assert.equal(auto.phase, 'live');
+  assert.deepEqual(log.source, [['presage', 2]]);
+});
+
+test('camera refused: back to simulated for that player, with the reason', async () => {
+  const { auto, log } = rig({ start: async () => { const e = new Error('Permission denied'); throw e; } });
+  await auto.start();
+  assert.equal(auto.phase, 'camera-error');
+  assert.deepEqual(log.source, [['presage', 2], ['mock', 2]]);
+  assert.match(auto.text(), /simulated.*Permission denied/);
+});
+
+test('it does not start twice (page load + Retry at the same time)', async () => {
+  const { auto, log } = rig();
+  await Promise.all([auto.start(), auto.retry(), auto.start()]);
+  assert.equal(log.started.length, 1);
+});
+
+test('chip text: measuring, live reading, lost signal, certificate hint', () => {
+  const now = 100000;
+  assert.match(presageChipText({ phase: 'live', lastSampleAt: 0, now }), /measuring.*10 seconds/);
+  assert.equal(presageChipText({ phase: 'live', lastSampleAt: now - 1000, hr: 71.6, now }), 'Heart rate: 72 bpm (live)');
+  assert.match(presageChipText({ phase: 'live', lastSampleAt: now - 9000, hr: 70, hint: 'No face found', now }), /lost the signal.*No face found/);
+  assert.match(presageChipText({ phase: 'no-bridge', needsCert: true }), /https:\/\/localhost:8790/);
+  assert.equal(presageChipText({ phase: 'weird' }), '');
+});
