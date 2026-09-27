@@ -19,6 +19,7 @@ import { initNetStatus } from './ui/netStatus.js';
 import { initLobby } from './ui/lobby.js';
 import { needsLobby } from './lobbyConfig.js';
 import { setPrizeEnabled } from './prize.js';
+import { setHazardEnabled } from './hazard.js';
 import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
 
 const canvas = document.getElementById('stage');
@@ -51,6 +52,8 @@ function startGame() {
 
   // Falling prize on by default; ?prize=0 turns it off. Only the host simulates it (the guest just draws it).
   setPrizeEnabled(params.get('prize') !== '0');
+  // Falling swords (avoid them or lose HP): on by default; ?swords=0 turns them off. Same host-only simulation.
+  setHazardEnabled(params.get('swords') !== '0');
 
   initMusic();
   initInput();

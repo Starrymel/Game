@@ -7,6 +7,7 @@ import {
   STAGE, PHYSICS, COMBAT, makeFighter, hurtbox, hitbox, overlaps,
 } from './fighter.js';
 import { createPrize, stepPrize, publicPrize } from './prize.js';
+import { createHazard, stepHazard, publicHazard } from './hazard.js';
 import {
   isNetHost, isNetGuest, isNetWaiting, broadcastState, requestRestart, setStateHandler, setRestartHandler,
 } from './net.js';
@@ -26,6 +27,7 @@ export function createMatch() {
     timeRemaining: ROUND_SECONDS,
     over: false,
     prize: createPrize(),
+    hazard: createHazard(),
     fighters: {
       1: makeFighter(1, STAGE.width * 0.3, 1),
       2: makeFighter(2, STAGE.width * 0.7, -1),
@@ -40,6 +42,7 @@ export function resetMatch(match) {
   match.timeRemaining = ROUND_SECONDS;
   match.over = false;
   match.prize = createPrize();
+  match.hazard = createHazard();
   match.fighters[1] = makeFighter(1, STAGE.width * 0.3, 1);
   match.fighters[2] = makeFighter(2, STAGE.width * 0.7, -1);
   bus.emit('round_start', { round: match.round, t: Date.now() });
@@ -101,6 +104,26 @@ function resolveHit(match, attacker, defender, kind, t) {
     bus.emit('ko', { winner: attacker.id, loser: defender.id, t });
     bus.emit('round_end', { round: match.round, winner: attacker.id, t });
   }
+}
+
+// Damage that has no attacker (falling swords). Blocking helps, it flinches, and it can KO (the other player then wins).
+function hurtByHazard(match, defender, baseDamage, t = Date.now()) {
+  let dmg = baseDamage;
+  if (defender.state === 'block') dmg *= (1 - BLOCK_DAMAGE_REDUCTION);
+  dmg = Math.max(0, dmg);
+  defender.hp = clamp(defender.hp - dmg, 0, defender.maxHp);
+  if (defender.hp > 0) {
+    defender.flinchMs = COMBAT.flinchBaseMs;
+    defender.state = 'flinch';
+    bus.emit('flinch', { player: defender.id, magnitude: 0.5, t });
+  } else if (!match.over) {
+    const winner = defender.id === 1 ? 2 : 1;
+    match.over = true;
+    defender.state = 'ko';
+    bus.emit('ko', { winner, loser: defender.id, t });
+    bus.emit('round_end', { round: match.round, winner, t });
+  }
+  return dmg;
 }
 
 function updateFighter(match, f, opponent, dtSeconds, t) {
@@ -224,6 +247,7 @@ export function stepMatch(match, dtSeconds, t) {
   updateFighter(match, match.fighters[1], match.fighters[2], dtSeconds, t);
   updateFighter(match, match.fighters[2], match.fighters[1], dtSeconds, t);
   stepPrize(match, dtSeconds, { emit: (name, payload) => bus.emit(name, payload) }); // no-op unless enabled
+  stepHazard(match, dtSeconds, { emit: (name, payload) => bus.emit(name, payload), hurt: (f, dmg) => hurtByHazard(match, f, dmg, t) }); // no-op unless enabled
 }
 
 export function buildSnapshot(match, t) {
@@ -254,6 +278,7 @@ export function buildNetState(match, t) {
     t, round: match.round, timeRemaining: match.timeRemaining, over: match.over,
     players: [p(1), p(2)],
     prize: publicPrize(match.prize),
+    hazard: publicHazard(match.hazard),
   };
 }
 
@@ -263,7 +288,7 @@ export function matchFromNetState(state) {
   const fighters = {};
   for (const p of state.players) fighters[p.id] = { ...p };
   return {
-    round: state.round, timeRemaining: state.timeRemaining, over: state.over, fighters, prize: state.prize,
+    round: state.round, timeRemaining: state.timeRemaining, over: state.over, fighters, prize: state.prize, hazard: state.hazard,
   };
 }
 

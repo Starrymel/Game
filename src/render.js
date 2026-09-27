@@ -2,6 +2,7 @@ import { drawHUD } from './ui/hud.js';
 import { beginEffects, drawEffects, impactPoint } from './ui/effects.js';
 import { STAGE, hurtbox, hitbox } from './fighter.js';
 import { drawPrize } from './ui/prizeRender.js';
+import { drawHazard } from './ui/hazardRender.js';
 
 const COLORS = { 1: '#4da3ff', 2: '#ff5c5c' };
 
@@ -89,6 +90,7 @@ export function render(ctx, match) {
 
   }
   drawPrize(ctx, match); // falling prize (no-op when the match has none)
+  drawHazard(ctx, match); // falling swords: floor warning + the sword (no-op when the match has none)
   // Draw attacks above both characters, so neither player's effect is hidden.
   for (const id of [1, 2]) drawAttack(ctx, match.fighters[id], match.fighters[id === 1 ? 2 : 1]);
   drawEffects(ctx, match);
