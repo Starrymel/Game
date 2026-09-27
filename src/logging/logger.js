@@ -118,7 +118,7 @@ function showAnalysisButton(id) {
   closeAnalysis();
   const btn = document.createElement('button');
   btn.textContent = 'View round recap';
-  btn.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;padding:12px 22px;font:600 16px system-ui,sans-serif;border:0;border-radius:10px;background:#2a78d6;color:#fff;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.4)';
+  btn.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;padding:12px 22px;font:600 16px system-ui,sans-serif;border:0;border-radius:10px;background:#a92e64;color:#fff;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.4)';
   btn.onclick = () => openOverlay(id);
   document.body.appendChild(btn);
   uiEls.push(btn);
