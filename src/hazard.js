@@ -66,7 +66,8 @@ export function stepHazard(match, dt, { random = Math.random, emit = () => {}, h
     h.x = Math.max(HAZARD.margin, Math.min(STAGE.width - HAZARD.margin, (target?.x ?? STAGE.width / 2) + jitter));
     h.art = Math.floor(random() * HAZARD.artSlots);
     h.phase = 'warn'; h.t = 0; h.yh = HAZARD.spawnTipHeight; h.hitIds = []; h.seq += 1;
-    emit('hazard_warn', { x: h.x });
+    h.target = target?.id ?? null;                          // who it was aimed at (for the match log: dodged or not)
+    emit('hazard_warn', { x: h.x, target: h.target });
     return;
   }
 
@@ -87,7 +88,10 @@ export function stepHazard(match, dt, { random = Math.random, emit = () => {}, h
       emit('hazard_hit', { player: id, damage: dealt, t: Date.now() });
       if (match.over) { h.phase = 'idle'; return; }
     }
-    if (h.yh <= 0) { h.phase = 'stuck'; h.t = 0; }
+    if (h.yh <= 0) {
+      h.phase = 'stuck'; h.t = 0;
+      if (h.target) emit('hazard_end', { target: h.target, hit: h.hitIds.includes(h.target) });
+    }
     return;
   }
 

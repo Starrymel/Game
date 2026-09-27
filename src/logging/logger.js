@@ -75,11 +75,17 @@ bus.on('state_snapshot', (s) => {
   m.buf.snapshots.push({ t: rel(s.t), ...m.lastSnap });
 });
 
-bus.on('hit', ({ attacker, defender, damage, kind, t }) => {
+bus.on('hit', ({ attacker, defender, damage, kind, blocked, t }) => {
   if (!m || m.ended) return;
-  ev(t, 'hit', defender, { attacker, damage: round1(damage), kind });
+  ev(t, 'hit', defender, { attacker, damage: round1(damage), kind, blocked: !!blocked });
   if (kind === 'special' || damage >= BIG_HIT_DAMAGE) ev(t, 'big_hit', defender, { attacker, damage: round1(damage), kind });
 });
+// Newer mechanics: attacks thrown (landed ones are the 'hit' events), swords, prizes.
+bus.on('attack', ({ player, kind, t }) => m && !m.ended && ev(t, 'attack', player, { kind }));
+bus.on('hazard_hit', ({ player, damage, t }) => m && !m.ended && ev(t || Date.now(), 'sword_hit', player, { damage: round1(damage) }));
+bus.on('hazard_end', ({ target, hit }) => m && !m.ended && !hit && ev(Date.now(), 'sword_dodged', target));
+bus.on('prize_caught', ({ player, hp, t }) => m && !m.ended && ev(t || Date.now(), 'prize_caught', player, { hp: round1(hp) }));
+bus.on('prize_missed', () => m && !m.ended && ev(Date.now(), 'prize_missed', null));
 bus.on('flinch', ({ player, magnitude, t }) => m && !m.ended && ev(t, 'flinch', player, { magnitude: round1(magnitude * 100) / 100 }));
 bus.on('special', ({ player, t }) => m && !m.ended && ev(t, 'special', player));
 bus.on('meter_full', ({ player, t }) => m && !m.ended && ev(t, 'meter_full', player));

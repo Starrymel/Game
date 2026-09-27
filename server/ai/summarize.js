@@ -9,6 +9,8 @@
 //     snapshots: [{ t, p1_hp, p2_hp, p1_meter, p2_meter }] }
 // t is ms since match start. Output is a small plain object (a few hundred tokens).
 
+const { matchStats } = require('../lib/matchStats');
+
 const HP_CURVE_POINTS = 16;
 const CALM_THRESHOLD = 0.6;
 const STRESS_THRESHOLD = 0.7;
@@ -78,7 +80,7 @@ function hpCurve(snapshots) {
 }
 
 // player = who it's about. comeback/panic_spike/calm_clutch come from the in-game recorder.
-const KEY_EVENT_TYPES = new Set(['special', 'heal_streak', 'meter_full', 'comeback', 'panic_spike', 'calm_clutch']);
+const KEY_EVENT_TYPES = new Set(['special', 'heal_streak', 'meter_full', 'comeback', 'panic_spike', 'calm_clutch', 'sword_hit', 'prize_caught']);
 
 function keyEvents(events) {
   const out = [];
@@ -119,6 +121,15 @@ function compactMatch(detail) {
   const hitsTaken = countBy(events, 'hit');
   const flinches = countBy(events, 'flinch');
   const specials = countBy(events, 'special');
+  const st = matchStats(events);
+  // Counted in code from the events, so Gemini only tells the story around real numbers.
+  const fight = (p) => {
+    const x = st.players[p];
+    return {
+      punches: x.punches, lasers: x.lasers, damageDealt: x.damageDealt, damageTaken: x.damageTaken, biggestHit: x.biggestHit,
+      swordsHit: x.swordsHit, swordsDodged: x.swordsDodged, prizesCaught: x.prizesCaught, prizeHealed: x.prizeHealed,
+    };
+  };
 
   return {
     names,
@@ -126,11 +137,12 @@ function compactMatch(detail) {
     durationS: sec(match.duration_ms ?? last?.t ?? 0),
     finalHp: last ? { 1: r0(last.p1_hp), 2: r0(last.p2_hp) } : null,
     players: {
-      1: { ...bioStats(samples, 1), hitsLanded: hitsTaken[2], hitsTaken: hitsTaken[1], specials: specials[1], flinchesSuffered: flinches[1] },
-      2: { ...bioStats(samples, 2), hitsLanded: hitsTaken[1], hitsTaken: hitsTaken[2], specials: specials[2], flinchesSuffered: flinches[2] },
+      1: { ...bioStats(samples, 1), hitsLanded: hitsTaken[2], hitsTaken: hitsTaken[1], specials: specials[1], flinchesSuffered: flinches[1], ...fight(1) },
+      2: { ...bioStats(samples, 2), hitsLanded: hitsTaken[1], hitsTaken: hitsTaken[2], specials: specials[2], flinchesSuffered: flinches[2], ...fight(2) },
     },
     ...hpStory(snapshots),
     hpCurve: hpCurve(snapshots),
+    prizesMissed: st.prizesMissed,
     keyEvents: keyEvents(events),
   };
 }
@@ -153,6 +165,11 @@ function templateSummary(c) {
   } else if (l && c.finalHp) {
     parts.push(`${n[l]} went down and ${n[w]} was left standing.`);
   }
+  // One fun line from the fight numbers: swords and prizes are the most visual bits.
+  const sw = [1, 2].map((q) => p[q].swordsHit ?? 0), dg = [1, 2].map((q) => p[q].swordsDodged ?? 0), pr = [1, 2].map((q) => p[q].prizesCaught ?? 0);
+  if (sw[0] + sw[1] >= 2 && sw[0] !== sw[1]) { const vic = sw[0] > sw[1] ? 1 : 2; parts.push(`${n[vic]} kept getting speared by falling swords.`); }
+  else if (dg[0] + dg[1] >= 3 && dg[0] !== dg[1]) { const dodger = dg[0] > dg[1] ? 1 : 2; parts.push(`${n[dodger]} danced around the falling swords.`); }
+  else if (pr[0] + pr[1] >= 2 && pr[0] !== pr[1]) { const grab = pr[0] > pr[1] ? 1 : 2; parts.push(`${n[grab]} grabbed the prizes.`); }
   const turningPoint = c.comeback
     ? `${n[c.comeback.player]} erased a ${c.comeback.wasBehindBy} HP deficit at ${Math.round(c.comeback.atS)}s.`
     : c.leadChanges.length

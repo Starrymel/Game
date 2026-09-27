@@ -50,6 +50,7 @@ export function resetMatch(match) {
 }
 
 function startAttack(f, kind) {
+  bus.emit('attack', { player: f.id, kind, t: Date.now() });     // for the match log (thrown vs landed)
   f.attack = {
     kind,
     elapsedMs: 0,
@@ -68,7 +69,7 @@ function resolveHit(match, attacker, defender, kind, t) {
   dmg = Math.max(0, dmg);
 
   defender.hp = clamp(defender.hp - dmg, 0, defender.maxHp);
-  bus.emit('hit', { attacker: attacker.id, defender: defender.id, damage: dmg, kind, t });
+  bus.emit('hit', { attacker: attacker.id, defender: defender.id, damage: dmg, kind, blocked: blocking, t });
 
   const flinchMult = Mechanics.calcFlinchMultiplier(defender);
   defender.flinchMs = COMBAT.flinchBaseMs * flinchMult;

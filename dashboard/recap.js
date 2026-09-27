@@ -60,8 +60,16 @@ function render(d) {
     `<span><i style="background:var(--p${p})"></i>${esc(a.names[p - 1])}</span>`).join('');
 
   const tile = (label, f) => `<div class="tile"><div class="label">${label}</div><div class="row">` +
-    [0, 1].map((i) => `<span class="v"><i style="background:var(--p${i + 1})"></i>${f(a.stats[i])}</span>`).join('') + '</div></div>';
-  $('stats').innerHTML = tile('Peak HR', (s) => fmt(s.peakHr)) + tile('Damage taken', (s) => fmt(s.dmg)) + tile('Flinches', (s) => s.flinches);
+    [0, 1].map((i) => `<span class="v"><i style="background:var(--p${i + 1})"></i>${f(a.stats[i], i)}</span>`).join('') + '</div></div>';
+  const fx = (d.stats && d.stats.players) || null;      // fight numbers counted by the server from the match log
+  const ft = (i) => fx && fx[i + 1];
+  const landed = (o) => (o.thrown == null ? `${o.landed}` : `${o.landed}/${o.thrown}`);
+  $('stats').innerHTML = tile('Peak HR', (s) => fmt(s.peakHr)) + tile('Flinches', (s) => s.flinches) +
+    (fx
+      ? tile('Damage dealt', (_, i) => ft(i).damageDealt) + tile('Damage taken', (_, i) => ft(i).damageTaken) +
+        tile('Punches landed', (_, i) => landed(ft(i).punches)) + tile('Lasers landed', (_, i) => landed(ft(i).lasers)) +
+        tile('Swords dodged', (_, i) => ft(i).swordsDodged) + tile('Prizes caught', (_, i) => ft(i).prizesCaught)
+      : tile('Damage taken', (s) => fmt(s.dmg)));
 
   $('full').href = './?match=' + encodeURIComponent(matchId);
   drawChart(d, a);
@@ -127,6 +135,17 @@ function drawChart(d, a) {
       s += `<text x="${lx}" y="${below ? cy + 26 : cy - 14}" text-anchor="middle" font-size="12" style="fill:var(--text)">Biggest hit</text>`;
     }
   }
+  // sword hits (x) and prizes caught (dot) on the victim's / catcher's health line
+  const hpAt = (t, p) => { const sn = d.snapshots.filter((x) => x['p' + p + '_hp'] != null); return sn.length ? sn.reduce((b, c) => (Math.abs(c.t - t) < Math.abs(b.t - t) ? c : b))['p' + p + '_hp'] : null; };
+  let hasSword = false, hasPrize = false;
+  for (const e of d.events) {
+    if ((e.type !== 'sword_hit' && e.type !== 'prize_caught') || !e.player) continue;
+    const hp = hpAt(e.t, e.player); if (hp == null) continue;
+    const cx = X(e.t), cy = hpY(hp);
+    if (e.type === 'sword_hit') { hasSword = true; s += `<g><title>Sword hit ${esc(a.names[e.player - 1])}: ${fmt(e.payload.damage)} damage</title><path d="M${cx - 5},${cy - 5} L${cx + 5},${cy + 5} M${cx + 5},${cy - 5} L${cx - 5},${cy + 5}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/></g>`; }
+    else { hasPrize = true; s += `<g><title>${esc(a.names[e.player - 1])} caught a prize (+${fmt(e.payload.hp)} HP)</title><circle cx="${cx}" cy="${cy}" r="6" fill="var(--bg)" stroke="var(--text)" stroke-width="3"/></g>`; }
+  }
+  if (hasSword || hasPrize) s += `<text x="${W - R}" y="${HP[0] - 8}" text-anchor="end" font-size="12" style="fill:var(--text-3)">${hasSword ? '\u2715 sword hit  ' : ''}${hasPrize ? '\u25EF prize' : ''}</text>`;
   if (a.ko) {
     const x = X(a.ko.t);
     s += `<line x1="${x}" x2="${x}" y1="${HP[0] - 4}" y2="${AX}" stroke="var(--text)" stroke-opacity=".55" stroke-width="2" stroke-dasharray="4 4"/>`;

@@ -60,7 +60,7 @@ export function stepPrize(match, dt, { random = Math.random, emit = () => {} } =
     if (p.yh <= PRIZE.landedHeightPx) p.landed = true;
   } else {
     p.ttl -= dt;
-    if (p.ttl <= 0) { p.active = false; p.timer = PRIZE.minGapS + random() * (PRIZE.maxGapS - PRIZE.minGapS); return; }
+    if (p.ttl <= 0) { emit('prize_missed', {}); p.active = false; p.timer = PRIZE.minGapS + random() * (PRIZE.maxGapS - PRIZE.minGapS); return; }
   }
 
   // First fighter to touch it wins it (fighter 1 checked first on an exact tie).

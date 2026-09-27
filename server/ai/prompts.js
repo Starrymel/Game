@@ -78,6 +78,10 @@ biometrics: calm fighters heal and charge faster; stressed fighters flinch harde
 Facts:
 - Use only facts in the log. Never invent events, numbers, or times.
 - Refer to fighters by the names in "names".
+- Each player also has fight numbers counted by the game: punches and lasers (thrown, landed), damageDealt,
+  damageTaken, biggestHit, swordsHit / swordsDodged (falling swords), prizesCaught / prizeHealed (falling prizes
+  that heal). They are true. Pick the ONE most striking story from them (for example a fighter who dodged every
+  sword, a laser that never missed, or a prize that swung the fight) and paint it in words; do not list them.
 - Event fields: "victim" = who got hit or flinched; "player" = who did it (special,
   heal_streak, meter_full); ko has winner and loser. Times are seconds from the start.
 
