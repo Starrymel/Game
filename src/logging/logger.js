@@ -137,7 +137,7 @@ function openOverlay(id) {
   const frame = document.createElement('iframe');
   frame.src = `/dashboard/recap.html?match=${encodeURIComponent(id)}`;
   frame.title = 'Round recap';
-  frame.style.cssText = 'width:min(780px,100%);height:min(600px,100%);border:1px solid #2c3040;border-radius:14px;background:#0b0d12;box-shadow:0 10px 40px rgba(0,0,0,.6)';
+  frame.style.cssText = 'width:min(780px,100%);height:min(600px,100%);border:1px solid #ba8095;border-radius:14px;background:#fce0e9;box-shadow:0 10px 40px rgba(0,0,0,.6)';
   const x = document.createElement('button');
   x.textContent = '\u2715';
   x.setAttribute('aria-label', 'Close recap');
