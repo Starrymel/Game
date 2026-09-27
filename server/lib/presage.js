@@ -59,9 +59,21 @@ function realMetricsModule() {
   return require('@smartspectra/node-sdk');
 }
 
+// PRESAGE_LOG_LEVEL=debug (or info/warning/error/none) on the server: the native SDK logs to
+// stdout/stderr (visible in Render's own log tab), which is the only way to see the REAL reason
+// behind a generic "SmartSpectra configuration failed" -- the wrapped JS error message alone
+// doesn't say why. Default is the SDK's own quiet default (kWarning) when unset.
+function resolveLogLevel(SmartSpectraLogLevel) {
+  const key = { debug: 'kDebug', info: 'kInfo', warning: 'kWarning', error: 'kError', none: 'kNone' }[
+    (process.env.PRESAGE_LOG_LEVEL || '').toLowerCase()
+  ];
+  return key ? SmartSpectraLogLevel[key] : undefined;
+}
+
 function defaultSdkFactory({ apiKey, requestedMetrics }) {
-  const { SmartSpectraSDK, FrameTransform } = realMetricsModule();
-  const sdk = new SmartSpectraSDK({ apiKey, requestedMetrics });
+  const { SmartSpectraSDK, SmartSpectraLogLevel, FrameTransform } = realMetricsModule();
+  const logLevel = resolveLogLevel(SmartSpectraLogLevel);
+  const sdk = new SmartSpectraSDK({ apiKey, requestedMetrics, ...(logLevel !== undefined ? { logLevel } : {}) });
   sdk.useCustomInput(FrameTransform.kNone);
   return sdk;
 }

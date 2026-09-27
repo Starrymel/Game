@@ -30,7 +30,7 @@ const STALE_MS = 6000;
 const isLocalBridge = (url) => /\/biometrics(\?|$)/.test(url || '');
 
 // The one line of text for the current situation. Pure.
-export function presageChipText({ phase, error, hr, lastSampleAt, hint, now = Date.now(), wsUrl = '' }) {
+export function presageChipText({ phase, error, hr, lastSampleAt, hint, serverError, now = Date.now(), wsUrl = '' }) {
   switch (phase) {
     case 'waiting': return 'Heart rate: getting ready...';
     case 'probing': return 'Heart rate: looking for the Presage bridge...';
@@ -41,6 +41,10 @@ export function presageChipText({ phase, error, hr, lastSampleAt, hint, now = Da
         : 'Heart rate: simulated. The Presage bridge is not running on this laptop (start it, then press Retry).';
     case 'camera-error': return `Heart rate: simulated (camera problem: ${error || 'unknown'}).`;
     case 'live': {
+      // The camera connected fine, but the server-side session itself failed afterward (missing key,
+      // SmartSpectra error) -- without this, that failure is invisible and just looks like an endless
+      // "measuring" with no way to tell why.
+      if (!lastSampleAt && serverError) return `Heart rate: unavailable (${serverError}). Press Retry once it's fixed.`;
       if (!lastSampleAt) return `Heart rate: measuring... hold still for about 10 seconds${hint ? ` (${hint})` : ''}.`;
       if (now - lastSampleAt > STALE_MS) return `Heart rate: lost the signal, keep your face in view${hint ? ` (${hint})` : ''}.`;
       return `Heart rate: ${Math.round(hr)} bpm (live)`;
@@ -83,10 +87,17 @@ export function createPresageAuto({
     start: run,
     retry: run,
     stop() { try { stop?.(); } catch (_) { /* already stopped */ } stop = null; if (phase === 'live') { setSource('mock', { player }); change('no-bridge'); } },
+    // A plain retry() is a no-op once phase is already 'live' (see run()'s guard) -- but a stuck
+    // live connection with a server-side error needs a real reconnect (fresh socket, fresh session),
+    // not just re-probing reachability, which already succeeded the first time.
+    async restart() { api.stop(); await run(); },
     noteReading(v) { hr = v; },
     snapshot() {
       const st = status();
-      return { phase, error, hr, lastSampleAt: st.lastSampleAt?.[player] || 0, hint: st.lastHint?.[player] || null };
+      return {
+        phase, error, hr, lastSampleAt: st.lastSampleAt?.[player] || 0, hint: st.lastHint?.[player] || null,
+        serverError: st.lastError?.[player] || null,
+      };
     },
     text() { return presageChipText({ ...api.snapshot(), wsUrl, now: now() }); },
   };
@@ -108,13 +119,16 @@ export function initPresageChip({ player, wsUrl, capture, after = Promise.resolv
 
   function paint() {
     const snap = auto.snapshot();
+    const stuckWithServerError = auto.phase === 'live' && !!snap.serverError && !snap.lastSampleAt;
     chip.hidden = false;
     chip.innerHTML = '';
     const text = document.createElement('span'); text.textContent = auto.text(); chip.append(text);
     if (auto.phase === 'no-bridge' || auto.phase === 'camera-error') {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Retry'; b.onclick = () => auto.retry(); chip.append(b);
+    } else if (stuckWithServerError) {
+      // A plain retry() no-ops while already 'live' -- this needs a fresh connection instead.
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Retry'; b.onclick = () => auto.restart(); chip.append(b);
     }
-    void snap;
   }
   paint();
   setInterval(() => { if (auto.phase === 'live') paint(); }, 1000);                    // keeps the age / signal-lost text current

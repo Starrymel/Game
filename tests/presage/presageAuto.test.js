@@ -81,5 +81,30 @@ test('chip text: measuring, live reading, lost signal, certificate hint', () => 
   assert.match(presageChipText({ phase: 'no-bridge', wsUrl: 'ws://192.168.1.5:8787/biometrics' }), /not running on this laptop/);
   // A deployed site's own same-origin /presage endpoint: no local process to start, different advice.
   assert.match(presageChipText({ phase: 'no-bridge', wsUrl: 'wss://composure.onrender.com/presage' }), /Could not reach Presage on the server/);
+  // The camera connected fine, but the server-side session itself failed: this must be visible,
+  // not indistinguishable from a normal "still measuring" wait.
+  assert.match(
+    presageChipText({ phase: 'live', lastSampleAt: 0, serverError: 'no API key configured on the server', now }),
+    /unavailable \(no API key configured on the server\)/,
+  );
   assert.equal(presageChipText({ phase: 'weird' }), '');
+});
+
+test('a server-side error is surfaced even though the camera connected fine (not silently swallowed)', async () => {
+  const { auto, log } = rig({ status: () => ({ lastSampleAt: { 2: 0 }, lastHint: {}, lastError: { 2: 'SmartSpectra session failed: no key' } }) });
+  await auto.start();
+  assert.equal(auto.phase, 'live');
+  assert.match(auto.text(), /unavailable \(SmartSpectra session failed: no key\)/);
+});
+
+test('restart() reconnects a live-but-broken session (plain retry() would no-op)', async () => {
+  const { auto, log } = rig();
+  await auto.start();
+  assert.equal(auto.phase, 'live');
+  await auto.retry();                    // no-op: phase is already 'live'
+  assert.equal(log.started.length, 1);
+  await auto.restart();                  // stop() then start() again: a real fresh connection
+  assert.equal(log.stopped, true);
+  assert.equal(log.started.length, 2);
+  assert.equal(auto.phase, 'live');
 });
