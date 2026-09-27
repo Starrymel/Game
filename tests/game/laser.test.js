@@ -83,3 +83,36 @@ test('the beam is drawn for the laser too (thinner than the special) and reaches
   m.fighters[1].attack = { kind: 'special', elapsedMs: 50, hasHit: false, phase: 'active' };
   assert.equal(beamGeometry(m.fighters[1], m.fighters[2]).scale, 1);
 });
+
+// ---- the hit explosion sits on the target at the end of the beam, not in the middle of the beam ----
+const { impactPoint } = await import('../../src/ui/effects.js');
+const { hurtbox } = await import('../../src/fighter.js');
+
+test('laser explosion lands on the target, wherever the target stands', () => {
+  for (const gap of [120, 200, 300]) {
+    const m = createMatch();
+    m.fighters[1].x = 100; m.fighters[2].x = 100 + gap;
+    m.fighters[1].attack = { kind: 'laser', elapsedMs: 50, hasHit: false, phase: 'active' };
+    const hit = impactPoint(m.fighters[1], m.fighters[2]);
+    const box = hurtbox(m.fighters[2]);
+    assert.ok(hit, `impact at gap ${gap}`);
+    assert.ok(hit.x >= box.x && hit.x <= box.x + box.w, `x ${hit.x} is on the target (${box.x}..${box.x + box.w}), not mid-beam`);
+    assert.ok(hit.y >= box.y && hit.y <= box.y + box.h, 'and at body height');
+  }
+});
+
+test('no explosion when the laser misses or is not in its active window; the special explodes bigger', () => {
+  const m = createMatch();
+  m.fighters[1].x = 100; m.fighters[2].x = 700;                                      // out of reach
+  m.fighters[1].attack = { kind: 'laser', elapsedMs: 50, hasHit: false, phase: 'active' };
+  assert.equal(impactPoint(m.fighters[1], m.fighters[2]), null);
+  m.fighters[2].x = 300;
+  m.fighters[1].attack.phase = 'recover';
+  assert.equal(impactPoint(m.fighters[1], m.fighters[2]), null);
+  m.fighters[1].attack = { kind: 'special', elapsedMs: 50, hasHit: false, phase: 'active' };
+  const sp = impactPoint(m.fighters[1], m.fighters[2]);
+  m.fighters[1].attack = { kind: 'laser', elapsedMs: 50, hasHit: false, phase: 'active' };
+  assert.ok(sp.height > impactPoint(m.fighters[1], m.fighters[2]).height);
+  m.fighters[1].attack = { kind: 'light', elapsedMs: 10, hasHit: false, phase: 'active' };
+  assert.equal(impactPoint(m.fighters[1], m.fighters[2]), null);                     // punches keep the old drawing
+});

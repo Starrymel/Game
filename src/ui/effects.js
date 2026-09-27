@@ -70,6 +70,17 @@ export function beamGeometry(attacker, defender) {
   return { eyes, ends, end, onTarget, scale: a.kind === 'laser' ? 0.6 : 1, alpha: Math.max(0, grow * fade), color: (EYES[attacker.id] ?? EYES[1]).color };
 }
 
+// Where the hit explosion goes for the ranged attacks (laser / special): on the target, where the beam ends.
+// (The attack's hit area is long, so its centre is mid-air; the explosion must not be drawn there.)
+// null when the beam isn't landing on the opponent right now.
+export function impactPoint(attacker, defender) {
+  const a = attacker.attack;
+  if (!a || a.phase !== 'active' || (a.kind !== 'laser' && a.kind !== 'special')) return null;
+  const beam = beamGeometry(attacker, defender);
+  if (!beam || !beam.onTarget) return null;
+  return { x: beam.end.x, y: beam.end.y, height: a.kind === 'special' ? 210 : 120 };
+}
+
 function drawBeam(ctx, beam, now) {
   const wobble = reduced() ? 1 : 1 + 0.18 * Math.sin(now * 0.06);
   ctx.save();
