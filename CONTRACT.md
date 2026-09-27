@@ -1,4 +1,4 @@
-# Composure — shared contract (v1)
+# Headiator — shared contract (v1)
 
 Everything below is stable API. If you need a change, shout in the group chat before
 editing this file — B, C, D all build against these shapes.

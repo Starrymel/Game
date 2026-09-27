@@ -108,7 +108,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   const el = document.createElement('div'); el.id = 'lobby';
   const remembered = load();
   el.innerHTML = `<div class="card" role="dialog" aria-label="Start">
-    <h1>Composure</h1>
+    <h1>Headiator</h1>
     <p class="lead">Play a friend online, or on this laptop. <span class="cam" id="lobby-cam" hidden><i></i><span></span></span></p>
     <p class="status" id="lobby-face" aria-live="polite"></p>
     <div class="options" id="lobby-options" role="listbox" aria-label="Who are you?">

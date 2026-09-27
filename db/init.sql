@@ -1,4 +1,4 @@
--- Composure: Tiger Data (TimescaleDB on Postgres) schema. Idempotent: safe to re-run.
+-- Headiator: Tiger Data (TimescaleDB on Postgres) schema. Idempotent: safe to re-run.
 -- Works on plain Postgres too (hypertable step is skipped if timescaledb is absent).
 
 DO $$ BEGIN

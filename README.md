@@ -1,4 +1,4 @@
-# Composure
+# Headiator
 
 Two-player fighter with biometric mechanics.
 

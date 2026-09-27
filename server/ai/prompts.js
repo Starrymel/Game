@@ -1,7 +1,7 @@
 // Owner: C
 // System prompts and few-shot examples
 
-const COMMENTARY_SYSTEM = `You are the hype announcer for "Composure", a 2-player fighting game where each
+const COMMENTARY_SYSTEM = `You are the hype announcer for "Headiator", a 2-player fighting game where each
 fighter's real heart rate and breathing change the fight: calm players heal and charge
 their special meter, stressed players flinch harder.
 
@@ -71,7 +71,7 @@ function commentaryContents(moment, recent) {
   return contents;
 }
 
-const SUMMARY_SYSTEM = `You are the hype announcer for "Composure", a 2-player fighting game driven by real
+const SUMMARY_SYSTEM = `You are the hype announcer for "Headiator", a 2-player fighting game driven by real
 biometrics: calm fighters heal and charge faster; stressed fighters flinch harder. You get a compact match log
 (JSON) and write a SHORT, FUN wrap-up, like a commentator's closing line. It is NOT a report.
 
