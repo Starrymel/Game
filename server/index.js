@@ -44,4 +44,6 @@ app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => console.log(`[server] http://localhost:${PORT}  db=${pool ? 'configured' : 'none (logging disabled)'}`));
 // Two-laptop relay on the same port (wss://<site>/netplay), so a single-port host like Render can run everything.
-require('./lib/relay').attachRelay(server, { log: (m) => console.log(m) });
+const relay = require('./lib/relay').attachRelay(server, { log: (m) => console.log(m) });
+// Lobby helper: who is sitting in a room right now? Exact room names only; nothing else is listed.
+app.get('/api/room/:name', (req, res) => res.json({ relay: true, ...relay.status(req.params.name) }));

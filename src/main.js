@@ -15,6 +15,9 @@ import { initFaceLab } from './ui/faceLab.js';
 import { initFaceOverlay } from './ui/faceOverlay.js';
 import { createFaceControl } from './face/faceControl.js';
 import { connectNet } from './net.js';
+import { initNetStatus } from './ui/netStatus.js';
+import { initLobby } from './ui/lobby.js';
+import { needsLobby } from './lobbyConfig.js';
 import { setPrizeEnabled } from './prize.js';
 import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
 
@@ -37,59 +40,70 @@ const params = new URLSearchParams(location.search);
 const role = params.get('role'); // 'host' | 'guest' | null
 const player = Number(params.get('player')) || (role === 'guest' ? 2 : 1);
 
-if (role === 'host' || role === 'guest') {
-  // URL choice (same Wi-Fi vs hosted https site, ?host=, ?room=) lives in netconfig.js.
-  connectNet({ relayUrl: relayUrlFor(location, params), asRole: role, myPlayer: player });
+// A plain visit shows the start screen (pick Player 1 / Player 2 + room code); the game itself only starts once
+// the link says how to play: ?role=host|guest (online), ?local=1 (this laptop only) or ?lobby=0.
+function startGame() {
+  if (role === 'host' || role === 'guest') {
+    // URL choice (same Wi-Fi vs hosted https site, ?host=, ?room=) lives in netconfig.js.
+    connectNet({ relayUrl: relayUrlFor(location, params), asRole: role, myPlayer: player });
+    initNetStatus();   // "waiting for the other player", "connection lost", "seat taken", and a Leave button
+  }
+
+  // Falling prize on by default; ?prize=0 turns it off. Only the host simulates it (the guest just draws it).
+  setPrizeEnabled(params.get('prize') !== '0');
+
+  initMusic();
+  initInput();
+  initBiometrics();
+  // Commentary must subscribe before runLoop() so it hears the first round_start.
+  window.__commentary = initCommentary({ bus });
+
+  // Where the Presage bridge is: on the host laptop when on the same Wi-Fi (?host=<address>), or on THIS laptop
+  // (localhost) when the page is the hosted https site. See netconfig.js.
+  const bridgeWsUrl = bridgeUrlFor(location, params);
+  // ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
+  const res = Number(params.get('presageRes'));
+  initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
+  // Face controls (MediaPipe, in this browser: no bridge, works on the hosted site and for the guest too).
+  // They start automatically with a short calibration; ?face=0 turns them off, or use the chip at the bottom left.
+  if (params.get('face') !== '0') {
+    const faceControl = createFaceControl({ player });
+    window.__faceControl = faceControl;
+    initFaceOverlay({ control: faceControl, player });
+    if (params.get('facelab')) initFaceLab({ player, control: faceControl });
+    if (faceControl.settings.enabled) faceControl.start();
+  }
+  if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
+
+  const match = runLoop({
+    onRender: (match) => render(ctx, match),
+  });
+  window.__match = match; // debug/tests
+  if (match) initDebugPanel(match); // Only the host owns mutable game state.
+
+  // Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).
+  window.addEventListener('keydown', (e) => {
+    if (e.target.closest?.('input, button, textarea, select')) return;
+    const k = e.key.toLowerCase();
+    if (k === '1') window.__forceBiometricState(1, 'stressed');
+    if (k === '2') window.__forceBiometricState(2, 'stressed');
+    if (k === 'q') window.__forceBiometricState(1, 'calm');
+    if (k === 'p') window.__forceBiometricState(2, 'calm');
+    if (k === '0') { window.__forceBiometricState(1, null); window.__forceBiometricState(2, null); }
+  });
+
+  // Presage setup: use the always-visible "Presage camera setup" panel above
+  // (needs a running bridge + camera permission + API key), or drive it by
+  // hand from the console -- both call the same functions:
+  //   await window.__listCameraDevices()
+  //   window.__setBiometricsSource('presage')
+  //   await window.__startPresageCapture(1, { deviceId })
+  window.__listCameraDevices = listCameraDevices;
+  window.__startPresageCapture = startPresageCapture;
 }
 
-// Falling prize on by default; ?prize=0 turns it off. Only the host simulates it (the guest just draws it).
-setPrizeEnabled(params.get('prize') !== '0');
-
-initMusic();
-initInput();
-initBiometrics();
-// Commentary must subscribe before runLoop() so it hears the first round_start.
-window.__commentary = initCommentary({ bus });
-
-// Where the Presage bridge is: on the host laptop when on the same Wi-Fi (?host=<address>), or on THIS laptop
-// (localhost) when the page is the hosted https site. See netconfig.js.
-const bridgeWsUrl = bridgeUrlFor(location, params);
-// ?presageRes=640 sends 640x480 frames (default 320x240) -- face details like blinks may need more pixels.
-const res = Number(params.get('presageRes'));
-initPresagePanel({ wsUrl: bridgeWsUrl, capture: res >= 160 ? { width: res, height: Math.round(res * 3 / 4) } : {} });
-// Face controls (MediaPipe, in this browser: no bridge, works on the hosted site and for the guest too).
-// They start automatically with a short calibration; ?face=0 turns them off, or use the chip at the bottom left.
-if (params.get('face') !== '0') {
-  const faceControl = createFaceControl({ player });
-  window.__faceControl = faceControl;
-  initFaceOverlay({ control: faceControl, player });
-  if (params.get('facelab')) initFaceLab({ player, control: faceControl });
-  if (faceControl.settings.enabled) faceControl.start();
+if (needsLobby(params)) {
+  // The start screen can be run with the face too (tilt to move, eyebrows or a smile to pick).
+  initLobby({ faceControl: params.get('face') !== '0' ? createFaceControl({ player: 1 }) : null });
 }
-if (params.get('blinklab')) initBlinkLab({ player, fire: params.get('blinkfire') !== '0' });
-
-const match = runLoop({
-  onRender: (match) => render(ctx, match),
-});
-window.__match = match; // debug/tests
-if (match) initDebugPanel(match); // Only the host owns mutable game state.
-
-// Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).
-window.addEventListener('keydown', (e) => {
-  if (e.target.closest?.('input, button, textarea, select')) return;
-  const k = e.key.toLowerCase();
-  if (k === '1') window.__forceBiometricState(1, 'stressed');
-  if (k === '2') window.__forceBiometricState(2, 'stressed');
-  if (k === 'q') window.__forceBiometricState(1, 'calm');
-  if (k === 'p') window.__forceBiometricState(2, 'calm');
-  if (k === '0') { window.__forceBiometricState(1, null); window.__forceBiometricState(2, null); }
-});
-
-// Presage setup: use the always-visible "Presage camera setup" panel above
-// (needs a running bridge + camera permission + API key), or drive it by
-// hand from the console -- both call the same functions:
-//   await window.__listCameraDevices()
-//   window.__setBiometricsSource('presage')
-//   await window.__startPresageCapture(1, { deviceId })
-window.__listCameraDevices = listCameraDevices;
-window.__startPresageCapture = startPresageCapture;
+else startGame();
