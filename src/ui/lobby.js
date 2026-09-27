@@ -9,27 +9,27 @@ import { joinSearch, localSearch, OPTIONS, optionEnabled, moveFocus, initialFocu
 const KEY = 'composure.lobby.v2';
 const CONFIRM_AFTER_MS = 800;   // a highlight must stay put this long before a gesture can pick it (no accidental picks while moving)
 const CSS = `
-#lobby{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#0b0d12;color:#f4f5f8;font:18px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:16px;overflow:auto}
+#lobby{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#fce0e9;color:#42271f;font:18px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:16px;overflow:auto}
 #lobby .card{width:min(980px,100%)}
 #lobby h1{margin:0 0 6px;font-size:34px;letter-spacing:.04em}
-#lobby p{margin:8px 0;color:#c9ccd8}
+#lobby p{margin:8px 0;color:#604032}
 #lobby .options{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
 @media (max-width:760px){#lobby .options{grid-template-columns:1fr}}
-#lobby .opt{font:inherit;color:#f4f5f8;background:#161a24;border:3px solid #2c3040;border-radius:18px;padding:30px 16px;min-height:170px;cursor:pointer;text-align:center}
+#lobby .opt{font:inherit;color:#42271f;background:#fff0f5;border:3px solid #ba8095;border-radius:18px;padding:30px 16px;min-height:170px;cursor:pointer;text-align:center}
 #lobby .opt b{display:block;font-size:26px;margin-bottom:8px}
-#lobby .opt small{display:block;color:#b6b9c6;font-size:16px}
+#lobby .opt small{display:block;color:#704b3e;font-size:16px}
 #lobby .opt.p1{border-color:#2d5f9e}
 #lobby .opt.p2{border-color:#9e2d3b}
-#lobby .opt.focus{background:#1f2a44;border-color:#ffd166;box-shadow:0 0 0 4px rgba(255,209,102,.35);transform:scale(1.03)}
+#lobby .opt.focus{background:#f5bfd3;border-color:#922450;box-shadow:0 0 0 4px rgba(146,36,80,.22);transform:scale(1.03)}
 #lobby .opt:disabled{opacity:.45;cursor:not-allowed}
-#lobby .opt.taken small{color:#ffd166}
-#lobby .help{margin-top:22px;padding:14px 18px;background:#12151d;border:1px solid #2c3040;border-radius:12px}
-#lobby .help b{color:#ffd166}
+#lobby .opt.taken small{color:#922450}
+#lobby .help{margin-top:22px;padding:14px 18px;background:#fff0f5;border:1px solid #ba8095;border-radius:12px}
+#lobby .help b{color:#922450}
 #lobby .status{margin-top:12px;min-height:1.5em}
-#lobby .warn{color:#ffd166}
+#lobby .warn{color:#922450}
 #lobby .row{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
-#lobby .link{font:inherit;color:#c9ccd8;background:none;border:1px solid #3a4058;border-radius:10px;padding:8px 14px;cursor:pointer}
-#lobby .link:hover,#lobby .link:focus-visible{border-color:#8a8ea0;outline:none}
+#lobby .link{font:inherit;color:#604032;background:none;border:1px solid #ba8095;border-radius:10px;padding:8px 14px;cursor:pointer}
+#lobby .link:hover,#lobby .link:focus-visible{border-color:#922450;outline:none}
 #lobby .sr{position:absolute;left:-9999px}
 `;
 

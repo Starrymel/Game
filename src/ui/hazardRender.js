@@ -88,8 +88,18 @@ export function drawHazard(ctx, match, now = performance.now()) {
   ctx.globalAlpha = alpha;
   const img = pickSwordArt(h.art);
   if (img) {
-    const w = HAZARD.width * 1.5, hh = w * img.naturalHeight / img.naturalWidth;
-    ctx.drawImage(img, h.x - w / 2, tipY - hh, w, hh);
+    if (img === images[0]) {
+      // Original art runs from top-left hilt to bottom-right tip.
+      // Rotate clockwise around the tip so it points straight down.
+      const side = HAZARD.length / Math.SQRT2;
+      ctx.translate(h.x, tipY);
+      ctx.rotate(Math.PI / 4);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, -side, -side, side, side);
+    } else {
+      const w = HAZARD.width * 1.5, hh = w * img.naturalHeight / img.naturalWidth;
+      ctx.drawImage(img, h.x - w / 2, tipY - hh, w, hh);
+    }
   } else drawFallbackSword(ctx, h.x, tipY);
   ctx.restore();
 }
