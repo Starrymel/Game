@@ -35,7 +35,7 @@ test('scoreMap and action mapping', () => {
 
 test('single eyebrow raise fires; both brows up does not', () => {
   const d = createGestureDetector();
-  const one = run(d, [[0, { browOuterUpLeft: 0.8, browOuterUpRight: 0.05 }], [80, { browOuterUpLeft: 0.8, browOuterUpRight: 0.05 }]]);
+  const one = run(d, [[0, { browOuterUpLeft: 0.8, browOuterUpRight: 0.05 }], [170, { browOuterUpLeft: 0.8, browOuterUpRight: 0.05 }]]);
   assert.deepEqual(one.map((x) => x[1]).filter((g) => g !== 'browsUp'), ['browLeft']);
   const d2 = createGestureDetector();
   assert.deepEqual(run(d2, [[0, { browOuterUpLeft: 0.8, browOuterUpRight: 0.8 }], [200, { browOuterUpLeft: 0.8, browOuterUpRight: 0.8 }]]).map((x) => x[1]).filter((g) => g !== 'browsUp'), []);
@@ -68,9 +68,9 @@ test('a small real-world smirk (0.29 vs 0.14) fires; a symmetric small smile doe
 
 test('eyebrow raise (either brow or both) fires; resting brows do not', () => {
   const d = createGestureDetector();
-  assert.deepEqual(run(d, [[0, { browOuterUpLeft: 0.4, browOuterUpRight: 0.11 }], [80, { browOuterUpLeft: 0.4, browOuterUpRight: 0.11 }]]).map((x) => x[1]), ['browsUp']);
+  assert.deepEqual(run(d, [[0, { browOuterUpLeft: 0.5, browOuterUpRight: 0.11 }], [170, { browOuterUpLeft: 0.5, browOuterUpRight: 0.11 }]]).map((x) => x[1]), ['browsUp']);
   const d2 = createGestureDetector();
   assert.deepEqual(run(d2, [[0, { browOuterUpLeft: 0.1, browOuterUpRight: 0.08, browInnerUp: 0.12 }], [300, { browOuterUpLeft: 0.1, browOuterUpRight: 0.08 }]]), []);
   const d3 = createGestureDetector();
-  assert.ok(run(d3, [[0, { browOuterUpLeft: 0.6, browOuterUpRight: 0.6 }], [80, { browOuterUpLeft: 0.6, browOuterUpRight: 0.6 }]]).some((x) => x[1] === 'browsUp'));
+  assert.ok(run(d3, [[0, { browOuterUpLeft: 0.6, browOuterUpRight: 0.6 }], [170, { browOuterUpLeft: 0.6, browOuterUpRight: 0.6 }]]).some((x) => x[1] === 'browsUp'));
 });

@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS = {
   mode: 'tilt',         // 'tilt' or 'lean'
   headSens: 1,          // multiplies the head thresholds (higher = needs a bigger move)
   maxSpeed: 1,          // 1 = walk at full speed while tilted (like a held key); lower = stop-and-go slower walking
-  browsUp: 0.3,         // eyebrow-raise sensitivity (lower = easier)
+  browsUp: 0.42,        // eyebrow-raise sensitivity (lower = easier)
   smirkUp: 0.22,        // one-sided smirk sensitivity (lower = easier)
   smileUp: 0.4,         // smile sensitivity (lower = easier)
   personalDone: false,  // the start screen has measured this person's eyebrows and smile

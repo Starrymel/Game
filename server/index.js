@@ -36,10 +36,16 @@ if (process.env.DEV_ROUTES !== '0') {
   });
 }
 
-app.use('/src', express.static(path.join(ROOT, 'src')));
+// no-store on source JS: without this, a plain reload (not a hard-reload)
+// can keep serving a stale cached copy after we push a fix -- happened
+// twice already (once with a whole extra generator still playing audio
+// that had been deleted server-side). Static assets (images/audio) don't
+// change mid-session so those stay normally cached for performance.
+const noCache = (res) => res.set('Cache-Control', 'no-store');
+app.use('/src', express.static(path.join(ROOT, 'src'), { setHeaders: noCache }));
 app.use('/assets', express.static(path.join(ROOT, 'assets')));
 app.use('/dashboard', express.static(path.join(ROOT, 'dashboard')));
-app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
+app.get('/', (_req, res) => { noCache(res); res.sendFile(path.join(ROOT, 'index.html')); });
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => console.log(`[server] http://localhost:${PORT}  db=${pool ? 'configured' : 'none (logging disabled)'}`));

@@ -31,6 +31,8 @@ export function createFaceControl({
   let warnings = [];
   let timer = null;
   let startedAt = 0;
+  let wasUp = false; // jump is edge-triggered: one jump per head-up gesture, not "hold to bounce forever"
+  let headActive = false; // true while ANY head tilt (left/right/up/down) is active (see the browsUp suppression below)
   const rest = { brows: [], smile: [] };   // face at rest, gathered while calibrating (for the personal thresholds)
 
   function apply() {
@@ -72,11 +74,21 @@ export function createFaceControl({
     // Sideways: hold the direction while tilted, like a held key. (maxSpeed < 1 gives a slower stop-and-go walk.)
     const phase = (now() % 240) / 240;
     if ((r.left || r.right) && (settings.maxSpeed >= 0.95 || phase < settings.maxSpeed)) pulseInput(player, r.left ? 'left' : 'right', 120);
-    for (const k of ['up', 'down']) if (r[k]) pulseInput(player, k, 120);
+    // Jump: one pulse per head-up gesture (rising edge only) -- otherwise holding your
+    // head up re-fires every frame, which reads as continuous bouncing, not a single jump.
+    if (r.up && !wasUp) pulseInput(player, 'up', 120);
+    wasUp = r.up;
+    headActive = r.left || r.right || r.up || r.down;
+    // Block: a genuine hold, same as holding the keyboard's down key.
+    if (r.down) pulseInput(player, 'down', 120);
   }));
 
   offs.push(bus.on('gesture', (g) => {
     if (g.player !== player || status !== 'ready') return;
+    // Any head tilt (left/right/up/down) shifts the face landmarks enough to nudge the eyebrow-raise
+    // score too, for most people -- so the laser must NOT fire while the head is actively tilted;
+    // it only fires from a genuine, deliberate eyebrow raise with the head at rest.
+    if (g.name === 'browsUp' && headActive) return;
     const a = actionFor(settings.map, g.name);
     if (a) pulseInput(player, a[0], a[1]);
   }));
@@ -130,7 +142,7 @@ export function createFaceControl({
       return;
     }
     rest.brows.length = 0; rest.smile.length = 0;
-    lastFaceAt = 0; startedAt = now(); frame = { luma: null, fps: null, eye: null };
+    lastFaceAt = 0; startedAt = now(); frame = { luma: null, fps: null, eye: null }; wasUp = false;
     head.recenter();
     setStatus('calibrating');
     clearInterval(timer);

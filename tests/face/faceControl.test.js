@@ -70,6 +70,19 @@ test('gestures follow the saved map; other players are ignored', async () => {
   fc.dispose();
 });
 
+test('the laser is suppressed while ANY head tilt is active, since tilting nudges the eyebrow score too', async () => {
+  const fc = mk(); await fc.start(); feed(1, {}, 40);
+  for (const spec of [{ roll: 40 }, { roll: -40 }, { cy: 0.35 }]) {   // left, right, up
+    feed(1, spec, 8);
+    bus.emit('gesture', { player: 1, name: 'browsUp' });
+    assert.equal(readInput(1).laser, false, JSON.stringify(spec));   // suppressed: the tilt itself, not a deliberate raise
+    feed(1, {}, 8);                                                   // back to neutral before the next case
+  }
+  bus.emit('gesture', { player: 1, name: 'browsUp' });
+  assert.equal(readInput(1).laser, true);                             // a genuine raise at rest still fires normally
+  fc.dispose();
+});
+
 test('settings are saved, restored, validated and applied live', () => {
   const st = memStorage();
   const a = createFaceControl({ player: 1, storage: st, track: async () => {}, untrack: () => {} });
@@ -80,7 +93,7 @@ test('settings are saved, restored, validated and applied live', () => {
   const b = createFaceControl({ player: 1, storage: st, track: async () => {}, untrack: () => {} });
   assert.equal(b.settings.browsUp, 0.45);
   assert.equal(b.settings.mode, 'lean');
-  assert.equal(createFaceControl({ player: 1, storage: memStorage({ browsUp: 'junk', map: { smile: 'explode' } }), track: async () => {}, untrack: () => {} }).settings.browsUp, 0.3);
+  assert.equal(createFaceControl({ player: 1, storage: memStorage({ browsUp: 'junk', map: { smile: 'explode' } }), track: async () => {}, untrack: () => {} }).settings.browsUp, 0.42);
 });
 
 test('stop() remembers the keyboard choice; warnings appear when the face is lost', async () => {

@@ -9,8 +9,8 @@ export const DEFAULTS = {
   smile: 0.6,
   browUp: 0.5,        // brow raise score above this = raised
   browDown: 0.25,     // the other brow must stay below this for a single-brow raise
-  browsUp: 0.3,       // any eyebrow raise (either brow or the inner brows) above this = raise
-  browHoldMs: 60,
+  browsUp: 0.42,      // any eyebrow raise (either brow or the inner brows) above this = raise
+  browHoldMs: 160,    // was 60ms (~2 frames) -- too easy to cross briefly from talking/blinking/normal expression
   smirkUp: 0.22,      // one mouth corner up above this ...
   smirkDiff: 0.12,    // ... and at least this much higher than the other corner
   smirkHoldMs: 80,

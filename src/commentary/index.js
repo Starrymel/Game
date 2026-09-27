@@ -3,7 +3,6 @@
 
 import { startCommentaryListener } from './listener.js';
 import { createAnnouncer } from './announcer.js';
-import { createElevenLabsPlayer } from './elevenLabsPlayer.js';
 import { createGeminiLineSource } from './aiClient.js';
 import { createMatchRecorder } from './matchRecorder.js';
 import { requestMatchSummary } from './summary.js';
@@ -11,9 +10,14 @@ import { createSummaryPanel } from './summaryPanel.js';
 
 const SUMMARY_DELAY_MS = 2500; // let the KO call land before the analysis
 
+// All sound removed from the game (music + announcer voice) -- this is a
+// silent stand-in for createElevenLabsPlayer(), same {play, stop} interface,
+// so moment detection and on-screen captions keep working, just muted.
+const createSilentPlayer = () => ({ async play() {}, stop() {} });
+
 export function initCommentary({
   bus,
-  player = createElevenLabsPlayer(),
+  player = createSilentPlayer(),
   lineSource = createGeminiLineSource(),
   summarize = requestMatchSummary,
 } = {}) {

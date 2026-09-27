@@ -67,6 +67,9 @@ export function createHeadController(opts = {}) {
       on.up = decide(on.up, -dyv, o.vertFrac);
       on.down = decide(on.down, dyv, o.vertFrac);
       if (on.left && on.right) { on.left = on.right = false; }
+      // A deliberate up/down tilt often carries a little incidental roll too (few people move on a
+      // perfectly pure axis) -- vertical wins so a jump attempt can't also nudge you sideways.
+      if ((on.up || on.down) && (on.left || on.right)) { on.left = on.right = false; }
       // Slow drift: while no direction is active the neutral creeps toward where you are resting, so leaning
       // back in your chair never walks the fighter; only quick, deliberate moves cross the thresholds.
       if (o.drift > 0 && !on.left && !on.right && !on.up && !on.down) {

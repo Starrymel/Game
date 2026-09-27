@@ -72,7 +72,9 @@ const match = runLoop({
   onRender: (match) => render(ctx, match),
 });
 window.__match = match; // debug/tests
-if (match) initDebugPanel(match); // Only the host owns mutable game state.
+// Only the host owns mutable game state, and hidden by default (opt in with
+// ?debug=1) so it doesn't clutter the screen during normal play/demo.
+if (match && params.get('debug') === '1') initDebugPanel(match);
 
 // Debug hotkeys for forcing mock biometric states (see CONTRACT.md #6).
 window.addEventListener('keydown', (e) => {

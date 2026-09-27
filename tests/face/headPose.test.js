@@ -35,6 +35,14 @@ test('vertical: head up = jump, head down = hide; neutral does nothing', () => {
   assert.equal(c.update(headSample(lm({ cy: 0.6 }))).down, true);
 });
 
+test('a tilt-up that also carries incidental roll only jumps, not walks', () => {
+  const c = calibrated();
+  const r = c.update(headSample(lm({ roll: 14, cy: 0.4 })));   // crosses both the left and up thresholds at once
+  assert.equal(r.up, true);
+  assert.equal(r.left, false);
+  assert.equal(r.right, false);
+});
+
 test('lean mode uses sideways head movement; recenter re-calibrates', () => {
   const c = calibrated({ mode: 'lean' });
   assert.equal(c.update(headSample(lm({ cx: 0.6 }))).left, true);   // image right = user's left
