@@ -43,3 +43,19 @@ test('lean mode uses sideways head movement; recenter re-calibrates', () => {
   assert.equal(c.isCalibrated(), false);
   assert.equal(c.update(null).left, false);
 });
+
+test('smoothing ignores a one-frame jitter but follows a held tilt', () => {
+  const c = calibrated({ smooth: 0.4 });
+  assert.equal(c.update(headSample(lm({ roll: 20 }))).left, false);           // single spike is damped (8 deg after smoothing)
+  let r; for (let i = 0; i < 8; i++) r = c.update(headSample(lm({ roll: 20 })));
+  assert.equal(r.left, true);                                                  // held tilt gets through
+});
+
+test('speed grows with the tilt: slow near the threshold, full at 2x', () => {
+  const c = calibrated({ tiltDeg: 10 });
+  const slow = c.update(headSample(lm({ roll: 11 }))).speed;
+  const fast = c.update(headSample(lm({ roll: 25 }))).speed;
+  assert.ok(slow > 0 && slow < 0.4, `slow=${slow}`);
+  assert.equal(fast, 1);
+  assert.equal(c.update(headSample(lm())).speed, 0);
+});

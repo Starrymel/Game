@@ -6,8 +6,8 @@ import { GESTURES } from '../face/gestures.js';
 import { createHeadController } from '../face/headPose.js';
 
 const ACTIONS = { none: null, punch: ['light', 150], special: ['special', 150], block: ['down', 400], jump: ['up', 200] };
-const LABELS = { smirkRight: 'Smirk: one mouth corner (right)', smirkLeft: 'Smirk: one mouth corner (left)', browLeft: 'Raise left eyebrow only', browRight: 'Raise right eyebrow only', blink: 'Long blink (both eyes)', winkLeft: 'Wink left eye', winkRight: 'Wink right eye', jawOpen: 'Mouth open', smile: 'Smile' };
-const DEFAULT_MAP = { smirkRight: 'punch', smirkLeft: 'punch', browLeft: 'none', browRight: 'none', blink: 'punch', winkLeft: 'none', winkRight: 'none', jawOpen: 'special', smile: 'none' };
+const LABELS = { browsUp: 'Raise eyebrows', smirkRight: 'Smirk: one mouth corner (right)', smirkLeft: 'Smirk: one mouth corner (left)', browLeft: 'Raise left eyebrow only', browRight: 'Raise right eyebrow only', blink: 'Long blink (both eyes)', winkLeft: 'Wink left eye', winkRight: 'Wink right eye', jawOpen: 'Mouth open', smile: 'Smile' };
+const DEFAULT_MAP = { browsUp: 'punch', smirkRight: 'none', smirkLeft: 'none', browLeft: 'none', browRight: 'none', blink: 'none', winkLeft: 'none', winkRight: 'none', jawOpen: 'special', smile: 'none' };
 
 export function actionFor(map, gesture) { return ACTIONS[map[gesture]] ?? null; }
 
@@ -23,12 +23,15 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
     <button type="button" id="fl-stop">Stop</button>
     <p id="fl-values">Eyes L/R: - | Mouth open: - | Mouth corners: -</p>
     <p id="fl-last"></p>
+    <p><label>Eyebrow sensitivity: raise must reach <b id="fl-brow-v">0.30</b> <input type="range" id="fl-brow" min="0.1" max="0.7" step="0.01" value="0.3"></label> (lower = easier; it also fires if the head-jump lifts your brows, so raise it if so)</p>
     <p><label>Smirk sensitivity: corner must reach <b id="fl-smirk-v">0.22</b> <input type="range" id="fl-smirk" min="0.08" max="0.6" step="0.01" value="0.22"></label> (lower = easier)</p>
     <p><label>Long blink = eyes closed for <b id="fl-hold-v">250</b> ms <input type="range" id="fl-hold" min="150" max="600" step="10" value="250"></label> (normal blinks are ~100-150 ms)</p>
     <fieldset id="fl-head"><legend>Head controls</legend>
       <label><input type="checkbox" id="fl-head-on" checked> On</label>
       Move sideways by: <select id="fl-head-mode"><option value="tilt">tilting head (ear to shoulder)</option><option value="lean">leaning head sideways</option></select>
-      <button type="button" id="fl-recenter">Recenter (sit neutral first)</button>
+      <br><label>Head sensitivity (higher = needs a bigger move) <b id="fl-headsens-v">1.0</b> <input type="range" id="fl-headsens" min="0.6" max="2" step="0.1" value="1"></label>
+      <br><label>Max walking speed <b id="fl-maxspeed-v">0.70</b> <input type="range" id="fl-maxspeed" min="0.2" max="1" step="0.05" value="0.7"></label>
+      <br><button type="button" id="fl-recenter">Recenter (sit neutral first)</button>
       <p id="fl-head-vals">Look at the camera in a neutral pose after clicking Start; it calibrates for about a second.</p>
       <p>Move left/right = tilt or lean | Jump = raise your head | Hide (block) = lower your head</p>
     </fieldset>
@@ -39,7 +42,8 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
   document.body.append(panel);
   const $ = (s) => panel.querySelector(s);
   const counts = {};
-  const gestureOpts = { blinkHoldMs: 250, smirkUp: 0.22 }; // shared with the detector: changes apply live
+  const gestureOpts = { blinkHoldMs: 250, smirkUp: 0.22, browsUp: 0.3 }; // shared with the detector: changes apply live
+  $('#fl-brow').oninput = (e) => { gestureOpts.browsUp = Number(e.target.value); $('#fl-brow-v').textContent = e.target.value; };
   $('#fl-smirk').oninput = (e) => { gestureOpts.smirkUp = Number(e.target.value); $('#fl-smirk-v').textContent = e.target.value; };
   $('#fl-hold').oninput = (e) => { gestureOpts.blinkHoldMs = Number(e.target.value); $('#fl-hold-v').textContent = e.target.value; };
   panel.querySelectorAll('select').forEach((sel) => { sel.onchange = () => { map_[sel.dataset.g] = sel.value; }; });
@@ -50,7 +54,12 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
   };
   $('#fl-stop').onclick = () => { stopFaceTracking(); $('#fl-status').textContent = 'Stopped.'; };
 
-  const head = createHeadController({ mode: 'tilt' });
+  // Gentler than the raw defaults: smoothing, bigger dead zone, speed grows with the tilt.
+  const BASE = { tiltDeg: 14, leanFrac: 0.4, vertFrac: 0.35 };
+  const head = createHeadController({ mode: 'tilt', ...BASE, smooth: 0.5 });
+  let maxSpeed = 0.7; // 0..1 cap on sideways walking speed
+  $('#fl-headsens').oninput = (e) => { const k = Number(e.target.value); $('#fl-headsens-v').textContent = k.toFixed(1); for (const key of Object.keys(BASE)) head.options[key] = BASE[key] * k; };
+  $('#fl-maxspeed').oninput = (e) => { maxSpeed = Number(e.target.value); $('#fl-maxspeed-v').textContent = maxSpeed.toFixed(2); };
   $('#fl-head-mode').onchange = (e) => { head.options.mode = e.target.value; head.recenter(); };
   $('#fl-recenter').onclick = () => head.recenter();
   bus.on('head_sample', (m) => {
@@ -64,7 +73,11 @@ export function initFaceLab({ player, map = DEFAULT_MAP }) {
     }
     if (!$('#fl-head-on').checked) return;
     // Held while the pose is held: refresh a short pulse every frame (drops out fast if tracking stops).
-    for (const k of ['left', 'right', 'up', 'down']) if (r[k]) pulseInput(player, k, 120);
+    // Sideways: pulse-width modulation, so a small tilt walks slowly and a big tilt walks at full speed.
+    const duty = r.speed * maxSpeed;
+    const phase = (Date.now() % 240) / 240;
+    if ((r.left || r.right) && phase < duty) pulseInput(player, r.left ? 'left' : 'right', 70);
+    for (const k of ['up', 'down']) if (r[k]) pulseInput(player, k, 120);
   });
 
   let lastPaint = 0;

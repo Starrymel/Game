@@ -7,6 +7,8 @@ export const DEFAULTS = {
   leanFrac: 0.35,   // sideways head shift, in eye-distances, beyond this = move
   vertFrac: 0.30,   // vertical head shift, in eye-distances: up = jump, down = hide
   hysteresis: 0.7,  // once triggered, stay on until the value falls below threshold * this
+  smooth: 1,        // 1 = raw; lower (e.g. 0.4) smooths camera jitter but adds a little lag
+  minSpeed: 0.25,   // walking speed (0..1) right when the tilt crosses the threshold; grows to 1 at 2x the threshold
 };
 
 export function headSample(lm) {
@@ -27,6 +29,7 @@ export function createHeadController(opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   let neutral = null;
   let acc = [];
+  let sm = null; // smoothed sample
   const on = { left: false, right: false, up: false, down: false };
   const CALIB = 30;
 
@@ -36,10 +39,14 @@ export function createHeadController(opts = {}) {
 
   return {
     options: o,
-    recenter() { neutral = null; acc = []; },
+    recenter() { neutral = null; acc = []; sm = null; },
     isCalibrated: () => !!neutral,
-    update(s) {
-      if (!s) { for (const k of Object.keys(on)) on[k] = false; return { ...on, values: null }; }
+    update(raw) {
+      let s = raw;
+      if (!s) { for (const k of Object.keys(on)) on[k] = false; sm = null; return { ...on, values: null, speed: 0 }; }
+      const a = o.smooth;
+      sm = sm && a < 1 ? { rollDeg: sm.rollDeg + a * (s.rollDeg - sm.rollDeg), x: sm.x + a * (s.x - sm.x), y: sm.y + a * (s.y - sm.y) } : { ...s };
+      s = sm;
       if (!neutral) {
         acc.push(s);
         if (acc.length >= CALIB) {
@@ -58,7 +65,9 @@ export function createHeadController(opts = {}) {
       on.up = decide(on.up, -dyv, o.vertFrac);
       on.down = decide(on.down, dyv, o.vertFrac);
       if (on.left && on.right) { on.left = on.right = false; }
-      return { ...on, values: { roll, lean: dxv, vert: dyv } };
+      // Analog-ish speed for sideways movement: crosses threshold slowly, reaches full speed at 2x threshold.
+      const speed = (on.left || on.right) ? Math.min(1, o.minSpeed + (1 - o.minSpeed) * (Math.abs(side) - sideThr) / sideThr) : 0;
+      return { ...on, speed: Math.max(0, speed), values: { roll, lean: dxv, vert: dyv } };
     },
   };
 }

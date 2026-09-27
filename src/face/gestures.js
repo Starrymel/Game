@@ -9,6 +9,7 @@ export const DEFAULTS = {
   smile: 0.6,
   browUp: 0.5,        // brow raise score above this = raised
   browDown: 0.25,     // the other brow must stay below this for a single-brow raise
+  browsUp: 0.3,       // any eyebrow raise (either brow or the inner brows) above this = raise
   browHoldMs: 60,
   smirkUp: 0.22,      // one mouth corner up above this ...
   smirkDiff: 0.12,    // ... and at least this much higher than the other corner
@@ -16,7 +17,7 @@ export const DEFAULTS = {
   cooldownMs: 250,    // minimum gap between the same gesture firing
 };
 
-export const GESTURES = ['smirkRight', 'smirkLeft', 'browLeft', 'browRight', 'blink', 'winkLeft', 'winkRight', 'jawOpen', 'smile'];
+export const GESTURES = ['browsUp', 'smirkRight', 'smirkLeft', 'browLeft', 'browRight', 'blink', 'winkLeft', 'winkRight', 'jawOpen', 'smile'];
 
 export function scoreMap(categories) {
   const m = {};
@@ -41,7 +42,9 @@ export function createGestureDetector(opts = {}) {
     const br = scores.browOuterUpRight ?? 0;
     const sl = scores.mouthSmileLeft ?? 0;
     const sr = scores.mouthSmileRight ?? 0;
+    const inner = scores.browInnerUp ?? 0;
     const active = {
+      browsUp: Math.max(bl, br, inner) > o.browsUp,
       smirkRight: sr > o.smirkUp && sr - sl > o.smirkDiff,
       smirkLeft: sl > o.smirkUp && sl - sr > o.smirkDiff,
       browLeft: bl > o.browUp && br < o.browDown,
@@ -52,7 +55,7 @@ export function createGestureDetector(opts = {}) {
       jawOpen: (scores.jawOpen ?? 0) > o.jawOpen,
       smile: smile > o.smile,
     };
-    const hold = { smirkRight: o.smirkHoldMs, smirkLeft: o.smirkHoldMs, browLeft: o.browHoldMs, browRight: o.browHoldMs, blink: o.blinkHoldMs, winkLeft: o.winkHoldMs, winkRight: o.winkHoldMs, jawOpen: 0, smile: 120 };
+    const hold = { browsUp: o.browHoldMs, smirkRight: o.smirkHoldMs, smirkLeft: o.smirkHoldMs, browLeft: o.browHoldMs, browRight: o.browHoldMs, blink: o.blinkHoldMs, winkLeft: o.winkHoldMs, winkRight: o.winkHoldMs, jawOpen: 0, smile: 120 };
     const out = [];
     for (const g of GESTURES) {
       if (!active[g]) { since[g] = null; fired[g] = false; continue; }
