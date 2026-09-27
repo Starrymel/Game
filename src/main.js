@@ -72,7 +72,9 @@ function startGame() {
   if (params.get('face') !== '0') {
     const faceControl = createFaceControl({ player });
     window.__faceControl = faceControl;
-    initFaceOverlay({ control: faceControl, player });
+    // ?calCountdown=<seconds> shortens the calibration countdowns (for testing); the default is 10 s per step.
+    const cal = Number(params.get('calCountdown'));
+    initFaceOverlay({ control: faceControl, player, ...(cal > 0 ? { countdownMs: cal * 1000, comfortMs: cal * 1000, comfortReturningMs: cal * 1000, holdMs: Math.min(3, cal) * 1000 } : {}) });
     if (params.get('facelab')) initFaceLab({ player, control: faceControl });
     if (faceControl.settings.enabled) faceControl.start();
   }

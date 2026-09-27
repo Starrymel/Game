@@ -73,7 +73,8 @@ test('templateSummary names the comeback as turning point', () => {
   const s = templateSummary(compactMatch(recordFixture()));
   assert.equal(s.headline, 'Player Two wins with a comeback!');
   assert.match(s.turningPoint, /Player Two erased a 75 HP deficit at 30s/);
-  assert.match(s.analysis, /Player Two stayed calmer/);
+  assert.match(s.analysis, /Player Two stayed calm/);
+  assert.ok(s.analysis.split(' ').length <= 25, 'the fallback is short too: ' + s.analysis);
 });
 
 test('generateSummary asks for JSON with schema on gemini-3.8-flash and parses it', async () => {
@@ -146,4 +147,40 @@ test('POST /api/ai/summary returns summary + combined text; 400 on empty log', a
   } finally {
     server.close();
   }
+});
+
+test('SUMMARY_SYSTEM asks for a short, fun wrap-up, not a stats report', () => {
+  const { SUMMARY_SYSTEM } = require('../../server/ai/prompts.js');
+  assert.match(SUMMARY_SYSTEM, /SHORT, FUN/);
+  assert.match(SUMMARY_SYSTEM, /NOT a report/);
+  assert.match(SUMMARY_SYSTEM, /AT MOST ONE number/);
+  assert.match(SUMMARY_SYSTEM, /exactly 2 short sentences/);
+  assert.doesNotMatch(SUMMARY_SYSTEM, /2-4 sentences|cite 1-3 concrete numbers/);   // the old, report-style asks are gone
+});
+
+test('tighten cuts a rambling model answer down to the limits', () => {
+  const { tighten, SUMMARY_LIMITS } = gemini;
+  const long = 'Player One controlled the early rounds with a calm avg of 0.83. Player Two spiked to 141 bpm at 12s and never recovered from it. A third sentence nobody asked for. A fourth.';
+  const t = tighten(long, SUMMARY_LIMITS.analysis);
+  assert.equal(t.split(/(?<=[.!?])\s+/).length, 2);
+  assert.ok(t.split(' ').length <= 40);
+  assert.equal(tighten('Short one', { sentences: 1, words: 16 }), 'Short one.');
+  const longWords = 'word '.repeat(30).trim();
+  assert.ok(tighten(longWords, { sentences: 1, words: 16 }).split(' ').length <= 16);
+  assert.equal(tighten('Comeback at 8.5 seconds! Wow.', { sentences: 1, words: 16 }), 'Comeback at 8.5 seconds!');   // decimals do not split a sentence
+});
+
+test('generateSummary shortens a long Gemini answer before storing it', async () => {
+  const s = await gemini.generateSummary(recordFixture(), {
+    apiKey: 'k',
+    fetchImpl: async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      headline: 'Player Two absolutely dominates this entire match from the very first second to the last',
+      analysis: 'One. Two. Three. Four.',
+      turningPoint: 'At 30s Player Two turned the whole thing around with a huge special move that nobody saw coming at all.',
+    }) }] } }] }) }),
+  });
+  assert.ok(s.headline.split(' ').length <= 10, s.headline);
+  assert.equal(s.analysis, 'One. Two.');
+  assert.ok(s.turningPoint.split(' ').length <= 16, s.turningPoint);
+  assert.equal(s.source, 'gemini');
 });

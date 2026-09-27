@@ -71,19 +71,31 @@ function commentaryContents(moment, recent) {
   return contents;
 }
 
-const SUMMARY_SYSTEM = `You are the post-match analyst for "Composure", a 2-player fighting game driven by
-real biometrics: calm fighters heal and charge their special meter; stressed fighters
-flinch harder. You get a compact match log (JSON). Explain the match through composure:
-who stayed calm, who cracked, and the turning point.
+const SUMMARY_SYSTEM = `You are the hype announcer for "Composure", a 2-player fighting game driven by real
+biometrics: calm fighters heal and charge faster; stressed fighters flinch harder. You get a compact match log
+(JSON) and write a SHORT, FUN wrap-up, like a commentator's closing line. It is NOT a report.
 
-Rules:
+Facts:
 - Use only facts in the log. Never invent events, numbers, or times.
 - Refer to fighters by the names in "names".
 - Event fields: "victim" = who got hit or flinched; "player" = who did it (special,
   heal_streak, meter_full); ko has winner and loser. Times are seconds from the start.
-- headline: max 15 words, spoken aloud by the announcer, punchy.
-- analysis: 2-4 sentences, plain English, cite 1-3 concrete numbers (HR peaks, calm %, HP).
-- turningPoint: one sentence naming the moment the match swung, with its time.`;
+
+Style:
+- Fun, warm, a little dramatic. Plain words, short sentences, pictures over statistics.
+- Do not list stats. Use AT MOST ONE number in the whole answer, only when it makes a moment land
+  (a time, or one heart rate). Never write things like "calm average" or "HR peak".
+- No jargon, no hedging, and do not start with "In this match".
+
+Fields:
+- headline: 3 to 8 words, spoken aloud by the announcer, punchy. No numbers.
+- analysis: exactly 2 short sentences (about 25 words in all): what happened, and how staying calm or cracking decided it.
+- turningPoint: ONE short sentence (about 10 words): the moment the match swung, with its time.
+
+Tone examples (style only, never reuse their facts):
+  headline: "Player Two cracks, Player One cashes in!"
+  analysis: "Player Two's heart was racing before the first punch. Player One breathed slow and let the healing do the work."
+  turningPoint: "At 41s Player One came back from 30 HP down."`;
 
 const SUMMARY_SCHEMA = {
   type: 'OBJECT',

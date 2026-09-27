@@ -171,3 +171,33 @@ test('walking holds the direction continuously while tilted (no stop-and-go)', a
   }
   assert.equal(held, checks);
 });
+
+test('the resting face keeps being collected after calibration, until the first measurement (so a 10 s "get comfortable" counts)', async () => {
+  const fc = mk(); await fc.start();
+  for (let i = 0; i < 40; i++) { bus.emit('face_values', { player: 1, scores: { browOuterUpLeft: 0.9, mouthSmileLeft: 0.5, mouthSmileRight: 0.5 } }); bus.emit('head_sample', { player: 1, sample: headSample(lm()) }); }
+  assert.equal(fc.status, 'ready');
+  // the person settles: the resting values drop, and that is what the baseline should reflect
+  for (let i = 0; i < 130; i++) bus.emit('face_values', { player: 1, scores: { browOuterUpLeft: 0.1, mouthSmileLeft: 0.05, mouthSmileRight: 0.05 } });
+  const p = fc.measure('brows', 40);
+  for (let i = 0; i < 10; i++) bus.emit('face_values', { player: 1, scores: { browOuterUpLeft: 0.7 } });
+  const r = await p;
+  assert.ok(Math.abs(r.baseline - 0.1) < 0.01, `baseline is the settled face, not the first second: ${r.baseline}`);
+  // after the first measurement the resting face is frozen (moving on purpose must not change it)
+  const p2 = fc.measure('smile', 40);
+  for (let i = 0; i < 10; i++) bus.emit('face_values', { player: 1, scores: { mouthSmileLeft: 0.8, mouthSmileRight: 0.8 } });
+  const r2 = await p2;
+  assert.ok(Math.abs(r2.baseline - 0.05) < 0.01, `smile baseline stayed at rest: ${r2.baseline}`);
+});
+
+test('a skipped measurement does not change the saved threshold', async () => {
+  const fc = mk(); await fc.start();
+  for (let i = 0; i < 40; i++) { bus.emit('face_values', { player: 1, scores: { browOuterUpLeft: 0.05 } }); bus.emit('head_sample', { player: 1, sample: headSample(lm()) }); }
+  const before = fc.settings.browsUp;
+  let skipped = false;
+  const p = fc.measure('brows', 40, { shouldApply: () => !skipped });
+  for (let i = 0; i < 10; i++) bus.emit('face_values', { player: 1, scores: { browOuterUpLeft: 0.9 } });
+  skipped = true;                                   // the person pressed Skip / tilted right during the hold
+  const r = await p;
+  assert.equal(r.ok, true);                         // it could tell
+  assert.equal(fc.settings.browsUp, before);        // but it was not applied
+});

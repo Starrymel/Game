@@ -25,6 +25,8 @@ const CSS = `
 #face-overlay button:hover,#face-overlay button:focus-visible,#face-chip button:hover,#face-chip button:focus-visible{border-color:#925125;outline:none}
 #face-overlay .primary{background:#e6a363;border-color:#925125}
 #face-overlay .warn{color:#843b12}
+#face-overlay .big{font-size:44px;font-weight:700;margin:10px 0;line-height:1.1}
+#face-overlay .tiny{font-size:12px;font-weight:400;opacity:.8;margin-top:16px}
 #face-warn{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:60;max-width:92vw;background:#3a2a05;border:1px solid #ffd166;color:#ffe9b0;border-radius:10px;padding:8px 14px;font:14px ui-monospace,Menlo,Consolas,monospace}
 #face-warn[hidden]{display:none}
 #face-toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:55;background:rgba(22,26,36,.94);border:1px solid #4a7bff;color:#f4f5f8;border-radius:10px;padding:8px 16px;font:15px ui-monospace,Menlo,Consolas,monospace;pointer-events:none}
@@ -34,7 +36,12 @@ const CSS = `
 #face-chip button{padding:3px 10px;font-size:13px;border-radius:999px}
 `;
 
-export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdownMs = 2000, holdMs = 2000 }) {
+// Calibration pace: every step counts down 10 seconds before it measures, then asks you to hold for 3.
+// A slow head tilt to the RIGHT skips the current step (small hint on every page).
+export const SKIP_HOLD_MS = 1000;     // the tilt must be held this long: a twitch or a stretch never skips
+export const SKIP_HINT = 'Tip: tilt your head slowly to the right to skip this step.';
+
+export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdownMs = 10000, holdMs = 3000, comfortMs = 10000, comfortReturningMs = 3000, now = () => Date.now() }) {
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
 
   const overlay = document.createElement('div');
@@ -54,32 +61,54 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
   let dismissed = false;       // the player skipped the walkthrough this session
   let personalToken = 0;       // bumps to cancel a running personal-calibration flow
   let personalWait = null;     // resolves when the person clicks Retry/Skip after a failed measurement
+  let skipRequested = false;   // Skip pressed (button or head tilt) during a countdown/hold: skip just that step
+  let comfortUntil = 0;        // the "get comfortable" page stays up until this time (10 s the first time)
+  let comfortToken = 0;
+  let shownAt = 0;            // when the current page appeared (a tilt right after it changes never counts)
+  let armed = false;          // the head must come back to neutral once before a tilt can skip
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function show(html) { overlay.innerHTML = `<div class="card">${html}</div>`; overlay.hidden = false; }
+  function show(html) { overlay.innerHTML = `<div class="card">${html}</div>`; overlay.hidden = false; shownAt = now(); armed = false; }
   const hide = () => { overlay.hidden = true; step = 'hidden'; clearTimeout(closeTimer); personalToken++; renderChip(); };
 
   function warningsHtml() {
     return control.warnings.length ? `<p class="warn" id="face-overlay-warn">${control.warnings.map((w) => w.text).join(' ')}</p>` : '';
   }
 
+  const hintHtml = () => `<p class="tiny" id="face-skip-hint">${SKIP_HINT}</p>`;
+  const setText = (sel, text) => { const el = overlay.querySelector(sel); if (el) el.textContent = text; };
+
+  // Show "label N" once a second while `ms` runs out. Returns false if the flow was cancelled meanwhile.
+  async function tick(ms, token, isCurrent, label) {
+    const end = now() + ms;
+    for (;;) {
+      const left = end - now();
+      if (left <= 0 || !isCurrent(token)) break;
+      setText('#face-count', `${label} ${Math.ceil(left / 1000)}`);
+      await sleep(Math.min(250, left));
+    }
+    return isCurrent(token);
+  }
+
   // Measure one gesture (eyebrows or smile) from this person's own face, so the thresholds fit them.
   async function measureOne(kind, label, instruction, token) {
+    skipRequested = false;
+    const current = (t) => t === personalToken && !skipRequested;
     for (;;) {
-      show(`<h2>${label}</h2><p>${instruction}</p><p id="face-count">Get ready...</p>
-        <div class="row"><button type="button" data-a="pskip">Skip this one</button></div>`);
-      await sleep(countdownMs);
-      if (token !== personalToken) return null;
-      const el = overlay.querySelector('#face-count'); if (el) el.textContent = 'NOW - and hold it!';
-      const res = await control.measure(kind, holdMs);
-      if (token !== personalToken) return null;
+      show(`<h2>${label}</h2><p>${instruction}</p><p class="big" id="face-count" aria-live="off">Get ready... ${Math.ceil(countdownMs / 1000)}</p>
+        <div class="row"><button type="button" data-a="pskip">Skip this one</button></div>${hintHtml()}`);
+      if (!await tick(countdownMs, token, current, 'Get ready...')) return null;      // cancelled, or skipped: on to the next step
+      const measuring = control.measure(kind, holdMs, { shouldApply: () => current(token) });
+      const holding = tick(holdMs, token, current, 'NOW - hold it!');
+      const res = await measuring; await holding;
+      if (token !== personalToken || skipRequested) return null;
       if (res.ok) {
         show(`<h2>${label}</h2><p>Got it. Your range: ${res.baseline.toFixed(2)} at rest, ${res.peak.toFixed(2)} at your best.</p>`);
-        await sleep(900);
+        await sleep(1500);
         return res;
       }
-      show(`<h2>${label}</h2><p class="warn">I couldn't see a clear difference from your resting face${warningsHtml() ? '' : ''}. Try a bigger movement, keep your face well lit and in view.</p>${warningsHtml()}
-        <div class="row"><button type="button" class="primary" data-a="pretry">Try again</button><button type="button" data-a="pskip">Skip (use the default)</button></div>`);
+      show(`<h2>${label}</h2><p class="warn">I couldn't see a clear difference from your resting face. Try a bigger movement, keep your face well lit and in view.</p>${warningsHtml()}
+        <div class="row"><button type="button" class="primary" data-a="pretry">Try again</button><button type="button" data-a="pskip">Skip (use the default)</button></div>${hintHtml()}`);
       const choice = await new Promise((r) => { personalWait = r; });
       personalWait = null;
       if (token !== personalToken) return null;
@@ -102,7 +131,8 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
     step = 'try';
     show(`<h2>All set!</h2><p>Try it: <b>raise your eyebrows</b> (laser) or <b>smile</b> (punch).</p>
       <p>Tilt your head to walk, raise it to jump, lower it to block.</p>${warningsHtml()}
-      <div class="row"><button type="button" class="primary" data-a="skip">Start playing</button></div>`);
+      <div class="row"><button type="button" class="primary" data-a="skip">Start playing</button></div>
+      <p class="tiny" id="face-skip-hint">Tip: tilt your head slowly to the right to start playing.</p>`);
   }
 
   function render() {
@@ -113,10 +143,19 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
       show(`<h2>Play with your face</h2><p>Loading face tracking... Allow the camera when your browser asks.</p>
         <p>First time takes a few seconds and needs internet.</p>
         <div class="row"><button type="button" data-a="keyboard">Play with the keyboard instead</button></div>`);
-    } else if (st === 'calibrating') {
-      step = 'calibrating';
-      show(`<h2>Get comfortable</h2><p>Sit so your whole face is in view, look at the screen and relax your face. Hold still for a moment...</p>${warningsHtml()}
-        <div class="row"><button type="button" data-a="skip">Skip</button><button type="button" data-a="keyboard">Use the keyboard</button></div>`);
+    } else if (st === 'calibrating' || (st === 'ready' && comfortUntil > now())) {
+      // The first page: sit comfortably. Stays up for a full countdown (10 s the first time, shorter when the person
+      // already calibrated before), even though the head baseline itself is taken in the first second.
+      if (step !== 'comfort') {
+        step = 'comfort';
+        const ms = control.settings.personalDone ? comfortReturningMs : comfortMs;
+        comfortUntil = now() + ms;
+        const token = ++comfortToken;
+        show(`<h2>Get comfortable</h2><p>Sit so your whole face is in view, look at the screen and relax your face.</p>
+          <p class="big" id="face-count" aria-live="off">${Math.ceil(ms / 1000)}</p>${warningsHtml()}
+          <div class="row"><button type="button" data-a="cskip">Skip this step</button><button type="button" data-a="keyboard">Use the keyboard</button></div>${hintHtml()}`);
+        tick(ms, token, (t) => t === comfortToken && step === 'comfort', '').then(() => { if (token === comfortToken && step === 'comfort') { comfortUntil = 0; step = 'hidden'; render(); } });
+      }
     } else if (st === 'ready' && step !== 'done') {
       if (!control.settings.personalDone && step !== 'personal') runPersonal();
       else if (control.settings.personalDone && step !== 'try' && step !== 'personal') renderTry();
@@ -132,13 +171,14 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
 
   overlay.addEventListener('click', (e) => {
     const a = e.target?.dataset?.a;
-    if (a === 'skip') { dismissed = true; hide(); }
+    if (a === 'cskip') { comfortUntil = 0; comfortToken++; step = 'hidden'; render(); }
+    else if (a === 'skip') { dismissed = true; hide(); }
     else if (a === 'keyboard') { control.stop(); dismissed = true; hide(); }
     else if (a === 'retry') { dismissed = false; control.start(); }
     else if (a === 'pretry') personalWait?.('retry');
     else if (a === 'pskip') {
       if (personalWait) personalWait('skip');
-      else { personalToken++; step = 'ready-try'; control.update({ personalDone: true }); renderTry(); } // skipping during a measurement
+      else skipRequested = true;                    // during a countdown/hold: skip only this step, the next one follows
     }
   });
 
@@ -173,6 +213,23 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
     step = 'done';
     show(`<h2>Nice!</h2><p>That's it - go get the prizes.</p>`);
     closeTimer = setTimeout(hide, autoCloseMs);
+  });
+
+  // Skip with the head: a SLOW tilt to the right (held SKIP_HOLD_MS, after coming back to neutral once). Does the same as
+  // the page's own skip button.
+  let rightSince = 0;
+  bus.on('head_state', (m) => {
+    if (m.player !== player || overlay.hidden) return;
+    const right = !!m.state?.right;
+    const t = now();
+    if (!right) { armed = t - shownAt > 800; rightSince = 0; setText('#face-skip-hint', step === 'try' ? 'Tip: tilt your head slowly to the right to start playing.' : SKIP_HINT); return; }
+    if (!armed || t - shownAt < 1500) return;                    // just arrived on this page, or still tilted from before
+    if (!rightSince) rightSince = t;
+    setText('#face-skip-hint', 'Skipping... keep it there');
+    if (t - rightSince >= SKIP_HOLD_MS) {
+      rightSince = 0; armed = false;
+      overlay.querySelector('[data-a="pskip"], [data-a="cskip"], [data-a="skip"]')?.click();
+    }
   });
 
   bus.on('face_status', (s) => { if (s.player === player) { if (s.status !== 'ready') { personalToken++; if (step === 'personal' || step === 'try' || step === 'done') step = 'hidden'; } render(); } });
