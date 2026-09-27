@@ -135,9 +135,7 @@ export function drawEffects(ctx, match) {
       ctx.fillRect(box.x - 8, box.y - 8, box.w + 16, box.h + 16);
     }
     if (heals[id] !== undefined && now - heals[id] < c.healMs) {
-      ctx.save(); ctx.strokeStyle = '#65ffb5'; ctx.shadowColor = '#65ffb5'; ctx.shadowBlur = 18;
-      ctx.lineWidth = 3; ctx.strokeRect(box.x - 5, box.y - 5, box.w + 10, box.h + 10);
-      ctx.fillStyle = '#65ffb5';
+      ctx.save(); ctx.fillStyle = '#65ffb5';
       for (let i = 0; i < 5; i++) {
         const rise = reduced() ? i * 12 : (now / 18 + i * 19) % 90;
         ctx.fillRect(box.x - 8 + i * 14, box.y + box.h - rise, 3, 3);
