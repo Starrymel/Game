@@ -35,7 +35,7 @@ function loadArt(path) {
   image.src = new URL(path, import.meta.url).href;
   return image;
 }
-const arena = loadArt('../assets/backgrounds/mma-arena.png');
+const arena = loadArt('../assets/backgrounds/stone-arena.jpeg');
 const explosion = loadArt('../assets/effects/explosion.png');
 const ready = image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 
