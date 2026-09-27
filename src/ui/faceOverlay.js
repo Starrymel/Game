@@ -2,7 +2,7 @@
 // (dark room, face lost, ...), and a small chip to recenter or switch to the keyboard. Views only: all logic
 // lives in face/faceControl.js.
 import { bus } from '../eventBus.js';
-import { actionFor } from '../face/actions.js';
+import { actionFor, ACTION_LABELS, LABELS } from '../face/actions.js';
 
 export function cameraErrorText(e) {
   const name = e?.name;
@@ -27,6 +27,9 @@ const CSS = `
 #face-overlay .warn{color:#843b12}
 #face-warn{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:60;max-width:92vw;background:#3a2a05;border:1px solid #ffd166;color:#ffe9b0;border-radius:10px;padding:8px 14px;font:14px ui-monospace,Menlo,Consolas,monospace}
 #face-warn[hidden]{display:none}
+#face-toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:55;background:rgba(22,26,36,.94);border:1px solid #4a7bff;color:#f4f5f8;border-radius:10px;padding:8px 16px;font:15px ui-monospace,Menlo,Consolas,monospace;pointer-events:none}
+#face-toast.warn{border-color:#ffd166;color:#ffe9b0}
+#face-toast[hidden]{display:none}
 #face-chip{position:fixed;left:12px;bottom:12px;z-index:40;display:flex;gap:8px;align-items:center;background:#f5d0aa;border:1px solid #b87d50;border-radius:999px;padding:6px 10px;font:13px ui-monospace,Menlo,Consolas,monospace;color:#51392a}
 #face-chip button{padding:3px 10px;font-size:13px;border-radius:999px}
 `;
@@ -38,7 +41,13 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
   overlay.id = 'face-overlay'; overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-live', 'polite'); overlay.hidden = true;
   const warnBar = document.createElement('div'); warnBar.id = 'face-warn'; warnBar.setAttribute('role', 'status'); warnBar.hidden = true;
   const chip = document.createElement('div'); chip.id = 'face-chip';
-  document.body.append(overlay, warnBar, chip);
+  const toast = document.createElement('div'); toast.id = 'face-toast'; toast.hidden = true; toast.setAttribute('role', 'status');
+  document.body.append(overlay, warnBar, chip, toast);
+  let toastTimer = null;
+  function flash(text, warn = false) {
+    toast.textContent = text; toast.classList.toggle('warn', warn); toast.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.hidden = true; }, 1300);
+  }
 
   let step = 'hidden';         // hidden | loading | calibrating | personal | try | done | error
   let closeTimer = null;
@@ -145,6 +154,17 @@ export function initFaceOverlay({ control, player, autoCloseMs = 2200, countdown
     else if (a === 'recal') { dismissed = false; control.update({ personalDone: false }); step = 'hidden'; control.recenter(); render(); }
     else if (a === 'off') { control.stop(); }
     else if (a === 'on') { dismissed = false; step = 'hidden'; control.start(); }
+  });
+
+  // Show what the camera saw, so "nothing happened" is never a mystery: detected -> what it does -> why not (meter).
+  bus.on('gesture', (g) => {
+    if (g.player !== player || control.status !== 'ready' || step === 'personal') return;
+    const act = control.settings.map[g.name];
+    if (!act || act === 'none') return;
+    let text = `${LABELS[g.name]} -> ${ACTION_LABELS[act] || act}`, warn = false;
+    const f = globalThis.__match?.fighters?.[player];             // only the host has the match; the guest just shows the gesture
+    if (act === 'special' && f && f.meter < f.maxMeter) { text += ` - not ready: meter ${Math.round((f.meter / f.maxMeter) * 100)}%`; warn = true; }
+    flash(text, warn);
   });
 
   // Successful try-it: any gesture that is mapped to an action counts.

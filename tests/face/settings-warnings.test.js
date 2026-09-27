@@ -6,14 +6,14 @@ import { lumaMean, evaluateWarnings } from '../../src/face/warnings.js';
 test('sanitizeSettings: defaults for junk, clamps numbers, keeps only known actions', () => {
   assert.deepEqual(sanitizeSettings(null), DEFAULT_SETTINGS);
   assert.deepEqual(sanitizeSettings('nope'), DEFAULT_SETTINGS);
-  const s = sanitizeSettings({ enabled: false, mode: 'weird', headSens: 50, maxSpeed: -3, map: { smile: 'punch', jawOpen: 'launch-missile', bogus: 'punch' } });
+  const s = sanitizeSettings({ enabled: false, mode: 'weird', headSens: 50, maxSpeed: -3, mapVersion: 3, map: { smile: 'punch', jawOpen: 'launch-missile', bogus: 'punch' } });
   assert.equal(s.enabled, false);
   assert.equal(s.mode, 'tilt');
   assert.equal(s.headSens, 2);
   assert.equal(s.maxSpeed, 0.2);
   assert.equal(s.map.smile, 'punch');
-  assert.equal(sanitizeSettings({ map: { smile: 'punchNear' } }).map.smile, 'punchNear');
-  assert.equal(DEFAULT_SETTINGS.map.browsUp, 'special');
+  assert.equal(sanitizeSettings({ mapVersion: 3, map: { smile: 'punchNear' } }).map.smile, 'punchNear');
+  assert.equal(DEFAULT_SETTINGS.map.browsUp, 'laser');
   assert.equal(DEFAULT_SETTINGS.map.smile, 'punchNear');
   assert.equal(s.map.jawOpen, 'none');      // unknown action -> default
   assert.equal(s.map.bogus, undefined);
@@ -43,4 +43,13 @@ test('lumaMean and warnings', () => {
   assert.equal(evaluateWarnings({ ...base, fps: 8 })[0].id, 'fps');
   // no face: only the face message plus lighting, never "move closer"
   assert.ok(!evaluateWarnings({ ...base, lastFaceAt: 0, eye: 0.03 }).some((w) => w.id === 'far'));
+});
+
+test('an old saved gesture map is replaced by the new defaults, but the person\'s calibrated thresholds are kept', () => {
+  const old = sanitizeSettings({ browsUp: 0.41, smileUp: 0.33, personalDone: true, map: { browsUp: 'special', smile: 'none', jawOpen: 'none' } }); // no mapVersion = saved before the change
+  assert.equal(old.map.browsUp, 'laser');
+  assert.equal(old.map.smile, 'punchNear');
+  assert.equal(old.browsUp, 0.41);
+  assert.equal(old.smileUp, 0.33);
+  assert.equal(old.personalDone, true);
 });

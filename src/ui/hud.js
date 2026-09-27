@@ -94,18 +94,12 @@ export function drawHUD(ctx, match) {
     ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#c7d6ea';
     ctx.fillText(b.source.toUpperCase() + ' / breath ' + b.breath.toFixed(1) + '/min', x + 10, 47);
     drawHealth(ctx, f, x);
-    ctx.save(); rounded(ctx, x + 10, 82, 278, 16, 8); ctx.clip();
-    ctx.fillStyle = '#26344b'; ctx.fillRect(x + 10, 82, 278, 16);
-    ctx.fillStyle = !b.gate ? '#6c7281' : f.meter >= f.maxMeter ? '#ffe278' : '#ba93ff';
-    ctx.fillRect(x + 10, 82, 278 * f.meter / f.maxMeter, 16); ctx.restore();
-    ctx.font = 'bold 11px monospace';
-    ctx.fillStyle = '#07162e';
-    ctx.fillText(f.meter >= f.maxMeter ? 'SPECIAL READY' : b.gate ? 'METER ' + Math.floor(f.meter) + '% / BREATH +' + Math.round((b.meterMultiplier - 1) * 100) + '%' : 'GATED / HR outside ' + mechanicsConfig.meter.hrMin + '-' + mechanicsConfig.meter.hrMax, x + 16, 94, 266);
+    // (The special/meter bar was removed: the eyebrow laser is the regular attack now, so there is no meter to show.)
     ctx.font = 'bold 11px monospace';
     ctx.fillStyle = b.healRate ? '#6affb4' : '#c7d6ea';
-    ctx.fillText(!b.valid ? 'NO SIGNAL / neutral damage & flinch' : b.healRate ? 'CALM +' + Math.round((b.healRate / mechanicsConfig.heal.base - 1) * 100) + '% HEAL / ' + (b.healingReady ? b.healRate.toFixed(1) + ' HP/s' : 'recovering from hit') : 'HEAL PAUSED / calm below threshold', x + 10, 113, 278);
+    ctx.fillText(!b.valid ? 'NO SIGNAL / neutral damage & flinch' : b.healRate ? 'CALM +' + Math.round((b.healRate / mechanicsConfig.heal.base - 1) * 100) + '% HEAL / ' + (b.healingReady ? b.healRate.toFixed(1) + ' HP/s' : 'recovering from hit') : 'HEAL PAUSED / calm below threshold', x + 10, 96, 278);
     ctx.fillStyle = b.flinch > 1 ? '#ffad86' : '#88c8ff';
-    ctx.fillText((b.spike > b.stress ? 'HR SPIKE' : b.flinch > 1 ? 'STRESS' : 'COMPOSED') + ' / FLINCH ' + b.flinch.toFixed(2) + 'x / DMG ' + b.damage.toFixed(2) + 'x', x + 10, 135, 278);
+    ctx.fillText((b.spike > b.stress ? 'HR SPIKE' : b.flinch > 1 ? 'STRESS' : 'COMPOSED') + ' / FLINCH ' + b.flinch.toFixed(2) + 'x / DMG ' + b.damage.toFixed(2) + 'x', x + 10, 118, 278);
     ctx.restore();
   }
 }

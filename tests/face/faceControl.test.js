@@ -54,16 +54,17 @@ test('once ready, a head tilt presses left; before that nothing happens', async 
 test('gestures follow the saved map; other players are ignored', async () => {
   const fc = mk(); await fc.start(); feed(1, {}, 40);
   bus.emit('gesture', { player: 2, name: 'browsUp' });
-  assert.equal(readInput(2).special, false);
+  assert.equal(readInput(2).laser, false);
   bus.emit('gesture', { player: 1, name: 'browsUp' });
-  assert.equal(readInput(1).special, true);              // default map: eyebrows = special (the laser)
+  assert.equal(readInput(1).laser, true);                // default map: eyebrows = the laser shot (regular attack)
+  assert.equal(readInput(1).special, false);
   bus.emit('gesture', { player: 1, name: 'smile' });
   assert.equal(readInput(1).lightNear, true);            // default map: smile = punch, only when the opponent is near
   assert.equal(readInput(1).light, false);
   fc.update({ map: { browsUp: 'none', smile: 'punch' } });
   await new Promise((r) => setTimeout(r, 420));          // let earlier pulses expire
   bus.emit('gesture', { player: 1, name: 'browsUp' });
-  assert.equal(readInput(1).special, false);
+  assert.equal(readInput(1).laser, false);
   bus.emit('gesture', { player: 1, name: 'smile' });
   assert.equal(readInput(1).light, true);                // now an always-punch
   fc.dispose();
