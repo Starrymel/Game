@@ -110,6 +110,21 @@ async function generateLine(moment, { recent = [], ...opts } = {}) {
 
 // detail: match-detail shape (see summarize.js). Always resolves: falls back to a
 // stats-based template if Gemini is unavailable or returns junk.
+// Makes the summary short even if the model ignores the length asks: first N sentences, then a word cap.
+function tighten(text, { sentences, words }) {
+  const parts = String(text).split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, sentences);
+  let out = parts.join(' ');
+  const w = out.split(' ');
+  if (w.length > words) out = w.slice(0, words).join(' ').replace(/[,;:\s]+$/, '');
+  if (out && !/[.!?]$/.test(out)) out += '.';
+  return out;
+}
+const SUMMARY_LIMITS = {
+  headline: { sentences: 1, words: 10 },
+  analysis: { sentences: 2, words: 40 },
+  turningPoint: { sentences: 1, words: 16 },
+};
+
 // Single-string form stored in matches.summary and shown on the dashboard.
 const summaryText = (s) => `${s.headline} ${s.analysis} Turning point: ${s.turningPoint}`;
 
@@ -136,7 +151,12 @@ async function generateSummary(detail, opts = {}) {
       });
       const parsed = JSON.parse(text);
       const clean = (x) => (typeof x === 'string' ? x.trim().replace(/\s+/g, ' ') : '');
-      const out = { headline: cleanLine(clean(parsed.headline)), analysis: clean(parsed.analysis), turningPoint: clean(parsed.turningPoint) };
+      const out = {
+        headline: cleanLine(clean(parsed.headline)),
+        analysis: tighten(clean(parsed.analysis), SUMMARY_LIMITS.analysis),
+        turningPoint: tighten(clean(parsed.turningPoint), SUMMARY_LIMITS.turningPoint),
+      };
+      out.headline = out.headline.split(' ').length > SUMMARY_LIMITS.headline.words ? tighten(out.headline, SUMMARY_LIMITS.headline).replace(/\.$/, '!') : out.headline;
       if (!out.headline || !out.analysis) throw new GeminiError('summary missing fields', 502);
       return { ...out, source: 'gemini', model };
     } catch (err) {
@@ -149,6 +169,6 @@ async function generateSummary(detail, opts = {}) {
 }
 
 module.exports = {
-  generateText, generateLine, generateSummary, summaryText, cleanLine, warm, GeminiError,
+  generateText, generateLine, generateSummary, summaryText, cleanLine, tighten, SUMMARY_LIMITS, warm, GeminiError,
   DEFAULT_LINE_MODEL, DEFAULT_SUMMARY_MODEL,
 };

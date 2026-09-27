@@ -143,13 +143,16 @@ function templateSummary(c) {
   const headline = w ? `${n[w]} wins${c.comeback?.player === w ? ' with a comeback' : ''}!` : 'A dead heat!';
   const parts = [];
   const p = c.players;
+  // Short and human, no stat dump: who cracked, who kept cool.
   if (p[1].calmAvg != null && p[2].calmAvg != null) {
     const calmer = p[1].calmAvg >= p[2].calmAvg ? 1 : 2;
     const other = calmer === 1 ? 2 : 1;
-    parts.push(`${n[calmer]} stayed calmer (calm ${p[calmer].calmAvg} vs ${p[other].calmAvg}).`);
-    parts.push(`${n[other]}'s heart rate peaked at ${p[other].hrPeak} bpm around ${Math.round(p[other].hrPeakAtS)}s.`);
+    const t = p[other].hrPeakAtS != null ? ` around ${Math.round(p[other].hrPeakAtS)}s` : '';
+    parts.push(`${n[other]} cracked first: the heart rate spiked${t}.`);
+    parts.push(`${n[calmer]} stayed calm and took it.`);
+  } else if (l && c.finalHp) {
+    parts.push(`${n[l]} went down and ${n[w]} was left standing.`);
   }
-  if (l && c.finalHp) parts.push(`${n[l]} went down; ${n[w]} finished with ${c.finalHp[w]} HP.`);
   const turningPoint = c.comeback
     ? `${n[c.comeback.player]} erased a ${c.comeback.wasBehindBy} HP deficit at ${Math.round(c.comeback.atS)}s.`
     : c.leadChanges.length
