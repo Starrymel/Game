@@ -88,9 +88,9 @@ export function render(ctx, match) {
   drawHUD(ctx, match);
 
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 20px monospace';
+  ctx.font = 'bold 26px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(String(Math.ceil(match.timeRemaining)), STAGE.width / 2, 32);
+  ctx.fillText(String(Math.ceil(match.timeRemaining)), STAGE.width / 2, 36);
   ctx.textAlign = 'left';
 
   if (match.over) {

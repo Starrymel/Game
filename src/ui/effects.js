@@ -25,6 +25,8 @@ const EYES = {
   1: { aspect: 1542 / 1760, color: '#ff3b3b', eyes: [[0.324, 0.40], [0.567, 0.393]] }, // dog: red sparkles
   2: { aspect: 928 / 1410, color: '#ffa31a', eyes: [[0.21, 0.326], [0.447, 0.298]] },  // bunny: orange sparkles
 };
+const laserArt = typeof Image === 'undefined' ? null : new Image();
+if (laserArt) laserArt.src = new URL('../../assets/effects/eye-laser.png', import.meta.url).href;
 const BEAM_FADE_MS = 200; // after the active window, while the attacker recovers
 
 export function eyePositions(f) {
@@ -60,7 +62,12 @@ export function beamGeometry(attacker, defender) {
     : { x: attacker.facing > 0 ? box.x + box.w : box.x, y: box.y + box.h / 2 };
   const grow = Math.min(1, a.elapsedMs / 40);                                  // quick charge-in
   const fade = a.elapsedMs <= active ? 1 : 1 - (a.elapsedMs - active) / BEAM_FADE_MS;
-  return { eyes: eyePositions(attacker), end, onTarget, alpha: Math.max(0, grow * fade), color: (EYES[attacker.id] ?? EYES[1]).color };
+  const eyes = eyePositions(attacker);
+  const center = { x: (eyes[0].x + eyes[1].x) / 2, y: (eyes[0].y + eyes[1].y) / 2 };
+  // Both rays use one aim slope, with separate endpoints rather than converging.
+  const slope = (end.y - center.y) / (end.x - center.x || attacker.facing);
+  const ends = eyes.map(eye => ({ x: end.x, y: eye.y + slope * (end.x - eye.x) }));
+  return { eyes, ends, end, onTarget, alpha: Math.max(0, grow * fade), color: (EYES[attacker.id] ?? EYES[1]).color };
 }
 
 function drawBeam(ctx, beam, now) {
@@ -68,14 +75,31 @@ function drawBeam(ctx, beam, now) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.globalCompositeOperation = 'lighter';
-  for (const eye of beam.eyes) {
+  for (const [i, eye] of beam.eyes.entries()) {
+    const tip = beam.ends[i];
+    if (laserArt?.complete && laserArt.naturalWidth > 0) {
+      const dx = tip.x - eye.x, dy = tip.y - eye.y;
+      const length = Math.hypot(dx, dy);
+      // The extracted sprite's flare is at 15.7% x / 49.1% y.
+      // Align that flare to the eye and the right edge to the real attack endpoint.
+      const width = length / (1 - 0.157);
+      const height = 30 * wobble;
+      ctx.save();
+      ctx.translate(eye.x, eye.y);
+      ctx.rotate(Math.atan2(dy, dx));
+      ctx.globalAlpha = beam.alpha;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(laserArt, -0.157 * width, -0.491 * height, width, height);
+      ctx.restore();
+      continue;
+    }
     ctx.globalAlpha = 0.45 * beam.alpha;
     ctx.strokeStyle = beam.color; ctx.shadowColor = beam.color; ctx.shadowBlur = 16;
-    ctx.lineWidth = 11 * wobble;
-    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(beam.end.x, beam.end.y); ctx.stroke();
+    ctx.lineWidth = 5 * wobble;
+    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
     ctx.globalAlpha = beam.alpha;
-    ctx.strokeStyle = '#fff6e0'; ctx.shadowBlur = 6; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(beam.end.x, beam.end.y); ctx.stroke();
+    ctx.strokeStyle = '#fff6e0'; ctx.shadowBlur = 4; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
     ctx.fillStyle = '#fff6e0';
     ctx.beginPath(); ctx.arc(eye.x, eye.y, 4 * wobble, 0, Math.PI * 2); ctx.fill();   // eye flare
   }
