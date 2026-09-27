@@ -10,11 +10,14 @@ import { KINDS } from '../face/personalCal.js';
 const KEY = 'composure.lobby.v2';
 // Face pace on this screen: slow and steady, nothing happens by accident.
 export const LOBBY_PACE = {
-  warmupMs: 5000,       // after the camera is ready, wait this long before any face input counts (time to read and settle)
-  moveHoldMs: 700,      // a head tilt must be HELD this long to move the highlight one step
-  moveCooldownMs: 1200, // and after a move, wait this long before the next one
-  settleMs: 2000,       // the highlight must have stayed put this long before a choice can start
-  selectHoldMs: 1500,   // eyebrows (or a smile) must be HELD this long to choose; a bar fills on the card meanwhile
+  warmupMs: 3000,        // after the camera is ready, wait this long before any face input counts (time to read and settle)
+  tiltDeg: 10,           // tilt (from your neutral) that counts on this screen: gentler than in the game, the hold is what keeps it safe
+  tiltReleaseDeg: 5,     // back inside this and the tilt is over (so a wobble around the edge does not flicker on and off)
+  moveHoldMs: 450,       // hold a tilt this long to move the highlight one step
+  repeatMs: 900,         // keep the tilt going and it steps again every this long (reach the last card in one motion)
+  gapToleranceMs: 200,   // tracking noise: a dropout shorter than this does not restart the hold
+  settleMs: 1200,        // the highlight must have stayed put this long before a choice can start
+  selectHoldMs: 1200,    // eyebrows (or a smile) must be HELD this long to choose; a bar fills on the card meanwhile
 };
 const CSS = `
 #lobby{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#ffeaaa;color:#42271f;font:600 18px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:16px;overflow:auto}
@@ -65,7 +68,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
       ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><b>${LABELS[id].title}</b><small data-note="${id}">${LABELS[id].note}</small><span class="prog" data-prog="${id}"></span></button>`).join('')}
     </div>
     <div class="help" id="lobby-help">
-      <p><b>Face:</b> tilt your head <b>slowly</b> left or right and hold it a moment to move the highlight. To choose, <b>raise your eyebrows</b> or <b>smile</b> and hold it until the bar fills.</p>
+      <p><b>Face:</b> tilt your head left or right and hold it a moment to move the highlight (keep tilting to keep moving, let go to stop). To choose, <b>raise your eyebrows</b> or <b>smile</b> and hold it until the bar fills.</p>
       <p><b>Keyboard:</b> Left / Right to move, Enter to choose. <b>Mouse:</b> click.</p>
     </div>
     <p class="status" id="lobby-face" aria-live="polite"></p>
@@ -152,7 +155,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
       case 'ready': {
         if (w) return w;
         const left = readyAt ? Math.ceil((PACE.warmupMs - (now() - readyAt)) / 1000) : 0;
-        return left > 0 ? `Face controls start in ${left}... (read the tips above)` : 'Face controls are ready. Tilt slowly and hold to move; hold your eyebrows up to choose.';
+        return left > 0 ? `Face controls start in ${left}... (read the tips above)` : 'Face controls are ready. Tilt and hold to move; hold your eyebrows up to choose.';
       }
       case 'error': return `Face controls did not start (${faceControl.error?.message || 'camera problem'}). You can still use the keyboard or the mouse.`;
       default: return 'Face controls are off. Use the keyboard or the mouse.';
@@ -175,21 +178,27 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     const warmTimer = setInterval(() => { if (!closed) paintFace(); }, 250);
     offs.push(() => clearInterval(warmTimer));
 
-    // Head: hold a tilt for moveHoldMs to move ONE step. After a step the head must come back to neutral, and there is a
-    // cooldown, so a wobble or a long tilt never races through the options.
-    let tiltDir = 0, tiltSince = 0, tiltArmed = false, lastMoveAt = 0;
+    // Head: hold a tilt for moveHoldMs to move one step; keep holding and it steps again every repeatMs (it stops at the ends).
+    // Uses the head angle itself (not the gameplay left/right flags), with its own gentler threshold, and forgives short
+    // tracking dropouts, so it does not need a big or perfectly steady tilt. Drift is off here: a held tilt must not fade away.
+    faceControl.head.options.drift = 0;
+    let dir = 0, since = 0, lastSeen = 0, lastStep = 0;
     offs.push(bus.on('head_state', (m) => {
       if (m.player !== 1 || faceControl.status !== 'ready') return;
-      const st = m.state, t = now();
-      headTilted = !!(st.left || st.right || st.up || st.down);
-      const dir = st.left ? -1 : st.right ? 1 : 0;
-      if (dir === 0) { tiltDir = 0; tiltSince = 0; tiltArmed = true; setBar('move', 0); return; }
-      if (!warmedUp() || !tiltArmed || t - lastMoveAt < PACE.moveCooldownMs) return;
-      if (dir !== tiltDir) { tiltDir = dir; tiltSince = t; }
-      if (t - tiltSince >= PACE.moveHoldMs) {
-        tiltArmed = false; lastMoveAt = t; tiltDir = 0;
-        setFocus(moveFocus(focus, dir, status));
-      }
+      const st = m.state, roll = st?.values?.roll, t = now();
+      if (roll == null) return;
+      headTilted = Math.abs(roll) > PACE.tiltReleaseDeg || !!(st.up || st.down);
+      // + roll = head tilted to the person's left. Once tilting, stay "on" until back inside the release angle.
+      const onLeft = roll >= (dir === -1 ? PACE.tiltReleaseDeg : PACE.tiltDeg);
+      const onRight = roll <= -(dir === 1 ? PACE.tiltReleaseDeg : PACE.tiltDeg);
+      const now_ = onLeft ? -1 : onRight ? 1 : 0;
+      if (now_ !== 0) {
+        lastSeen = t;
+        if (now_ !== dir) { dir = now_; since = t; lastStep = 0; }
+      } else if (t - lastSeen > PACE.gapToleranceMs) { dir = 0; since = 0; lastStep = 0; }
+      if (dir === 0 || !warmedUp()) return;
+      const due = lastStep === 0 ? t - since >= PACE.moveHoldMs : t - lastStep >= PACE.repeatMs;
+      if (due) { lastStep = t; setFocus(moveFocus(focus, dir, status)); }
     }));
 
     // Choosing: eyebrows (or a smile) HELD for selectHoldMs, with the head still and the highlight settled. A bar on the card
