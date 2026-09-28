@@ -1,11 +1,16 @@
-// Start screen: three big choices (Player 1, Player 2, this laptop only). Works with the face, the keyboard and the mouse:
-//   face:      SMILE = Player 1, RAISE EYEBROWS = Player 2 (hold it until the bar fills)
+// Start screen: three big choices (Player 1, Player 2, Play solo). Works with the face, the keyboard and the mouse:
+//   face:      SMILE = Player 1, RAISE EYEBROWS = Player 2, OPEN YOUR MOUTH = Play solo (hold it until the bar fills)
 //   keyboard:  Left/Right (or Tab) to move, Enter/Space to pick
 //   mouse:     click
 // Picking reloads the page into the right role. Everyone shares one room for now (see lobbyConfig.js).
 import { bus } from '../eventBus.js';
-import { joinSearch, localSearch, OPTIONS, optionEnabled, moveFocus, initialFocus } from '../lobbyConfig.js';
+import { joinSearch, soloSearch, OPTIONS, optionEnabled, moveFocus, initialFocus } from '../lobbyConfig.js';
 import { KINDS } from '../face/personalCal.js';
+
+// "Open your mouth" picks Play solo on this screen. Unlike smile/eyebrows it has no personal
+// calibration yet (see face/faceControl.js's measure()), so it uses the same fixed default as the
+// in-game gesture detector's jawOpen threshold (src/face/gestures.js) rather than a per-person one.
+const MOUTH_OPEN = 0.5;
 
 const KEY = 'composure.lobby.v2';
 // Face pace on this screen: slow and steady, nothing happens by accident.
@@ -32,7 +37,10 @@ export function median(xs) {
 }
 export function baselineFrom(samples, t, windowMs) {
   const w = samples.filter((x) => t - x.t <= windowMs);
-  return { roll: median(w.map((x) => x.roll)), brows: median(w.map((x) => x.brows)), smile: median(w.map((x) => x.smile)) };
+  return {
+    roll: median(w.map((x) => x.roll)), brows: median(w.map((x) => x.brows)), smile: median(w.map((x) => x.smile)),
+    mouth: median(w.map((x) => x.mouth)),
+  };
 }
 // Slowly follow the head while it is near neutral (never during a deliberate tilt).
 export function driftBaseline(baseRoll, roll, releaseDeg, k) {
@@ -87,7 +95,7 @@ const CSS = `
 const LABELS = {
   p1: { title: "I'm Player 1", gest: 'Smile', note: 'starts the match' },
   p2: { title: "I'm Player 2", gest: 'Raise eyebrows', note: 'joins Player 1' },
-  local: { title: 'This laptop only', gest: 'Click or Enter', note: 'two players, one screen' },
+  solo: { title: 'Play solo', gest: 'Open your mouth', note: 'Player 2 plays on its own' },
 };
 // Hand-drawn icons in the page's own colours (thick brown outline, warm fill), so they read from across a desk.
 const INK = '#42271f', SKIN = '#ffd9a0';
@@ -96,7 +104,8 @@ const face = `<circle cx="50" cy="52" r="38" fill="${SKIN}"/>`;
 export const ICONS = {
   p1: svg(`${face}<circle cx="37" cy="44" r="4.5" fill="${INK}" stroke="none"/><circle cx="63" cy="44" r="4.5" fill="${INK}" stroke="none"/><path d="M27 60 Q50 88 73 60" stroke-width="6"/><path d="M24 55 L29 58 M76 55 L71 58" stroke-width="3.5"/>`),
   p2: svg(`${face}<path d="M24 30 Q35 12 47 26" stroke-width="6"/><path d="M53 26 Q65 12 76 30" stroke-width="6"/><circle cx="37" cy="48" r="4.5" fill="${INK}" stroke="none"/><circle cx="63" cy="48" r="4.5" fill="${INK}" stroke="none"/><path d="M41 72 H59"/>`),
-  local: svg(`<rect x="16" y="24" width="68" height="46" rx="6" fill="${SKIN}"/><path d="M8 78 H92"/><circle cx="37" cy="39" r="6"/><circle cx="63" cy="39" r="6"/><path d="M27 62 Q37 48 47 62 M53 62 Q63 48 73 62" stroke-width="4"/>`),
+  // A player face plus a small wind-up-key badge: the second fighter plays by itself, no one driving it.
+  solo: svg(`${face}<circle cx="37" cy="46" r="4.5" fill="${INK}" stroke="none"/><circle cx="63" cy="46" r="4.5" fill="${INK}" stroke="none"/><path d="M32 64 H68" stroke-width="6"/><rect x="68" y="10" width="22" height="18" rx="3"/><path d="M79 28 V38" stroke-width="4"/><circle cx="79" cy="19" r="4"/>`),
 };
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) { return {}; } }
@@ -109,7 +118,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
   const remembered = load();
   el.innerHTML = `<div class="card" role="dialog" aria-label="Start">
     <h1>Headiator</h1>
-    <p class="lead">Play a friend online, or on this laptop. <span class="cam" id="lobby-cam" hidden><i></i><span></span></span></p>
+    <p class="lead">Play a friend online, or by yourself. <span class="cam" id="lobby-cam" hidden><i></i><span></span></span></p>
     <p class="status" id="lobby-face" aria-live="polite"></p>
     <div class="options" id="lobby-options" role="listbox" aria-label="Who are you?">
       ${OPTIONS.map((id) => `<button type="button" class="opt ${id}" data-id="${id}" role="option"><span class="prog" data-prog="${id}"></span>${ICONS[id]}<b>${LABELS[id].title}</b><span class="gest">${LABELS[id].gest}</span><small data-note="${id}">${LABELS[id].note}</small></button>`).join('')}
@@ -178,7 +187,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     closed = true;
     save({ player: id === 'p2' ? 2 : 1 });
     $('#lobby-announce').textContent = `${LABELS[id].title}. Starting...`;
-    go(id === 'local' ? localSearch(location.search) : joinSearch(location.search, { player: id === 'p1' ? 1 : 2, relayPort }));
+    go(id === 'solo' ? soloSearch(location.search) : joinSearch(location.search, { player: id === 'p1' ? 1 : 2, relayPort }));
   }
 
   // ---- mouse and keyboard ----
@@ -200,7 +209,7 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
         if (w) return w;
         const left = readyAt ? Math.ceil((PACE.warmupMs - (now() - readyAt)) / 1000) : 0;
         if (left <= 0 && !baseReady) return 'Relax your face... almost there';
-        return left > 0 ? (left <= 1 ? 'Relax your face... almost there' : `Starting in ${left}... sit comfortably, relaxed face`) : 'Go! Smile = Player 1 · Raise eyebrows = Player 2';
+        return left > 0 ? (left <= 1 ? 'Relax your face... almost there' : `Starting in ${left}... sit comfortably, relaxed face`) : 'Go! Smile = Player 1 · Raise eyebrows = Player 2 · Open your mouth = Play solo';
       }
       case 'error': return `Face controls did not start (${faceControl.error?.message || 'camera problem'}). You can still use the keyboard or the mouse.`;
       default: return 'Face controls are off. Use the keyboard or the mouse.';
@@ -250,17 +259,20 @@ export function initLobby({ pollMs = 2000, go = (search) => { location.search = 
     offs.push(bus.on('face_values', (m) => {
       if (m.player !== 1 || faceControl.status !== 'ready' || closed) return;
       const t = now(), sc = m.scores;
-      if (sc && !base) { samples.push({ t, roll: NaN, brows: KINDS.brows(sc), smile: KINDS.smile(sc) }); if (samples.length > 400) samples.shift(); }
+      if (sc && !base) { samples.push({ t, roll: NaN, brows: KINDS.brows(sc), smile: KINDS.smile(sc), mouth: KINDS.mouth(sc) }); if (samples.length > 400) samples.shift(); }
       const b = ensureBase(t);
       const reset = () => { selectSince = 0; holdKind = null; setBar('select', 0); };
       if (!b || !sc) return reset();
       const s = faceControl.settings;
-      // how far above the needed level each gesture is (negative = not doing it); the stronger one wins
+      // how far above the needed level each gesture is (negative = not doing it); the strongest one wins
       const smileX = KINDS.smile(sc) - Math.max(s.smileUp, Math.min(b.smile, 0.75 * s.smileUp) + PACE.browMargin);
       const browsX = KINDS.brows(sc) - Math.max(s.browsUp, Math.min(b.brows, 0.75 * s.browsUp) + PACE.browMargin);
-      const kind = smileX > 0 && smileX >= browsX ? 'smile' : browsX > 0 ? 'brows' : null;
+      const mouthX = KINDS.mouth(sc) - Math.max(MOUTH_OPEN, Math.min(b.mouth, 0.75 * MOUTH_OPEN) + PACE.browMargin);
+      const kind = smileX > 0 && smileX >= browsX && smileX >= mouthX ? 'smile'
+        : browsX > 0 && browsX >= mouthX ? 'brows'
+        : mouthX > 0 ? 'mouth' : null;
       if (!kind) return reset();
-      const id = kind === 'smile' ? 'p1' : 'p2';
+      const id = kind === 'smile' ? 'p1' : kind === 'brows' ? 'p2' : 'solo';
       if (!optionEnabled(id, status)) { reset(); return; }          // that seat is taken: nothing to choose
       if (kind !== holdKind) { holdKind = kind; selectSince = t; setFocus(OPTIONS.indexOf(id)); }
       const k = Math.min(1, (t - selectSince) / PACE.selectHoldMs);

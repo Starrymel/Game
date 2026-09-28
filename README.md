@@ -67,7 +67,10 @@ default:
 
 Outside of combat, the same two gestures drive every menu: **smile** claims Player 1 in
 the lobby and confirms "play again" at round end; **raise your eyebrows** claims Player 2
-and picks "exit." Buttons are always shown too, for whenever a camera isn't available.
+and picks "exit." The start screen has a third gesture just for itself: **open your
+mouth** picks "Play solo," a one-laptop match against a bot-controlled Player 2 (it
+moves, attacks, and blocks -- see `src/bot.js` to tune it). Buttons are always shown too,
+for whenever a camera isn't available.
 
 Other expressions — a wink, a single raised eyebrow, a smirk, a long blink, opening your
 mouth — can each be remapped to punch / laser / special / block / jump instead, from the

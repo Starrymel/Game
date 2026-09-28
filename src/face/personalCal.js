@@ -5,6 +5,7 @@
 export const KINDS = {
   brows: (s) => Math.max(s.browOuterUpLeft ?? 0, s.browOuterUpRight ?? 0, s.browInnerUp ?? 0),
   smile: (s) => ((s.mouthSmileLeft ?? 0) + (s.mouthSmileRight ?? 0)) / 2,
+  mouth: (s) => s.jawOpen ?? 0,
 };
 
 // Threshold sits part of the way from rest to your peak, so it is clearly above rest noise yet reachable.

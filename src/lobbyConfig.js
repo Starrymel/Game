@@ -13,7 +13,7 @@ export function needsLobby(params) {
   return true;
 }
 
-const ROUTING_PARAMS = ['role', 'player', 'room', 'lobby', 'local', 'relayPort'];
+const ROUTING_PARAMS = ['role', 'player', 'room', 'lobby', 'local', 'solo', 'relayPort'];
 
 // The link to open for a choice: keeps unrelated params (?facelab=1 and friends), replaces the routing ones.
 export function joinSearch(currentSearch, { player, room, relayPort } = {}) {
@@ -31,6 +31,16 @@ export function localSearch(currentSearch) {
   const params = new URLSearchParams(currentSearch);
   for (const k of ROUTING_PARAMS) if (k !== 'room') params.delete(k);
   params.set('local', '1');
+  return '?' + params.toString();
+}
+
+// Same as localSearch, but Player 2 is a wandering bot instead of a second person on the keyboard
+// (see src/bot.js). Still a one-laptop game, so it reuses ?local=1 and just adds ?solo=1 on top.
+export function soloSearch(currentSearch) {
+  const params = new URLSearchParams(currentSearch);
+  for (const k of ROUTING_PARAMS) if (k !== 'room') params.delete(k);
+  params.set('local', '1');
+  params.set('solo', '1');
   return '?' + params.toString();
 }
 
@@ -57,7 +67,7 @@ export function waitingText({ role, room, peerPresent }) {
 }
 
 // The options on the start screen, left to right. Taken seats are skipped when moving the highlight.
-export const OPTIONS = ['p1', 'p2', 'local'];
+export const OPTIONS = ['p1', 'p2', 'solo'];
 export function optionEnabled(id, status) {
   if (id === 'p1') return !status?.host;
   if (id === 'p2') return !status?.guest;

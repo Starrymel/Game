@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeRoom, needsLobby, joinSearch, localSearch, lobbySearch, seatInfo, waitingText, DEFAULT_ROOM, OPTIONS, optionEnabled, moveFocus, initialFocus } from '../../src/lobbyConfig.js';
+import { sanitizeRoom, needsLobby, joinSearch, localSearch, soloSearch, lobbySearch, seatInfo, waitingText, DEFAULT_ROOM, OPTIONS, optionEnabled, moveFocus, initialFocus } from '../../src/lobbyConfig.js';
 
 const P = (s) => new URLSearchParams(s);
 
@@ -38,6 +38,13 @@ test('local play and back-to-lobby links', () => {
   assert.equal(lobbySearch('?role=host&player=1&room=A'), '');
 });
 
+test('solo play (bot Player 2) is local play plus ?solo=1, and clears a stale solo flag otherwise', () => {
+  assert.equal(soloSearch('?role=host&facelab=1'), '?facelab=1&local=1&solo=1');
+  assert.equal(P(soloSearch('')).get('local'), '1');
+  assert.equal(P(soloSearch('')).get('solo'), '1');
+  assert.equal(P(localSearch('?solo=1')).get('solo'), null);   // switching from solo back to plain local drops it
+});
+
 test('seat buttons reflect who is in the room', () => {
   assert.deepEqual(seatInfo({ host: true, guest: false }), { 1: { taken: true, label: 'taken' }, 2: { taken: false, label: 'free' } });
   assert.deepEqual(seatInfo(null), { 1: { taken: false, label: '' }, 2: { taken: false, label: '' } });
@@ -51,15 +58,15 @@ test('waiting messages say who you are and who you wait for', () => {
 });
 
 test('moving the highlight skips taken seats and stops at the ends', () => {
-  assert.deepEqual(OPTIONS, ['p1', 'p2', 'local']);
+  assert.deepEqual(OPTIONS, ['p1', 'p2', 'solo']);
   const none = { host: false, guest: false };
   assert.equal(moveFocus(0, 1, none), 1);
   assert.equal(moveFocus(1, 1, none), 2);
   assert.equal(moveFocus(2, 1, none), 2);                                   // end of the row
   assert.equal(moveFocus(0, -1, none), 0);
   assert.equal(moveFocus(0, 1, { host: false, guest: true }), 2);           // Player 2 taken: jump over it
-  assert.equal(moveFocus(2, -1, { host: false, guest: true }), 0);
-  assert.equal(optionEnabled('local', { host: true, guest: true }), true);  // this laptop is always possible
+  assert.equal(moveFocus(2, -1, { host: false, guest: true }), 0);          // moving left from solo: jump over it too
+  assert.equal(optionEnabled('solo', { host: true, guest: true }), true);   // solo is always possible, seats or not
 });
 
 test('the highlight starts on the remembered seat, or the first free one', () => {
@@ -68,6 +75,6 @@ test('the highlight starts on the remembered seat, or the first free one', () =>
   assert.equal(initialFocus(2, none), 1);
   assert.equal(initialFocus(1, { host: true, guest: false }), 1);           // Player 1 is taken: start on Player 2
   assert.equal(initialFocus(2, { host: false, guest: true }), 0);
-  assert.equal(initialFocus(1, { host: true, guest: true }), 2);            // both taken: this laptop
+  assert.equal(initialFocus(1, { host: true, guest: true }), 2);            // both taken: solo
   assert.equal(initialFocus(1, null), 0);                                    // unknown status: everything selectable
 });

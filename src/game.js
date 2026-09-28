@@ -9,6 +9,7 @@ import {
 } from './fighter.js';
 import { createPrize, stepPrize, publicPrize } from './prize.js';
 import { createHazard, stepHazard, publicHazard } from './hazard.js';
+import { stepBot } from './bot.js';
 import {
   isNetHost, isNetGuest, isNetWaiting, broadcastState, requestRestart, setStateHandler, setRestartHandler,
 } from './net.js';
@@ -320,6 +321,7 @@ export function runLoop({ onSnapshot, onRender } = {}) {
   function frame(now) {
     const frameMs = Math.min(now - last, 250); // clamp huge tab-switch gaps
     last = now;
+    stepBot(match, Date.now()); // no-op unless solo mode enabled it (see bot.js)
     physicsAccMs += frameMs;
     snapshotAccMs += frameMs;
 

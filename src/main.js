@@ -23,6 +23,7 @@ import { needsLobby } from './lobbyConfig.js';
 import { setPrizeEnabled } from './prize.js';
 import { setHazardEnabled } from './hazard.js';
 import { relayUrlFor, bridgeUrlFor } from './netconfig.js';
+import { setBotEnabled } from './bot.js';
 
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
@@ -56,6 +57,9 @@ function startGame() {
   setPrizeEnabled(params.get('prize') !== '0');
   // Falling swords (avoid them or lose HP): on by default; ?swords=0 turns them off. Same host-only simulation.
   setHazardEnabled(params.get('swords') !== '0');
+  // Solo play (?local=1&solo=1, chosen from the lobby's "Play solo" card): Player 2 is bot-controlled
+  // (moves, attacks, sometimes blocks) instead of needing a second person on the keyboard. See bot.js.
+  setBotEnabled(params.get('solo') === '1', 2);
 
   initMusic();
   initInput();
